@@ -1451,6 +1451,12 @@
     .siem-explain li { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
     .siem-explain code { color: var(--text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; }
     .siem-hint-text { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; font-style: italic; }
+    /* Real command output (grep run against the in-memory auth.log) */
+    .siem-output { margin: 9px 0 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .siem-output-cmd { background: #11161f; color: var(--muted); font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; padding: 7px 11px; border-bottom: 1px solid var(--border); white-space: pre-wrap; word-break: break-all; }
+    .siem-output-body { margin: 0; padding: 9px 11px; background: #0a0d13; color: var(--green); font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+    .siem-note { margin-top: 9px; padding: 10px 13px; border: 1px solid var(--cyan); border-radius: 6px; background: rgba(56,189,248,.06); font-size: 12px; line-height: 1.7; color: var(--text); }
+    .siem-note code { color: var(--cyan); background: rgba(56,189,248,.08); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; }
     /* Capstone — the graded, no-hints assessment that completes the lab */
     .lab4-capstone { margin-top: 22px; padding: 18px; border: 1px solid var(--warning); border-radius: 8px; background: rgba(251,191,36,.05); }
     .capstone-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -5539,13 +5545,15 @@ function checkAnswer(rawInput, spec) {
   }
   return { correct: correct, message: correct ? spec.right : spec.hint };
 }
+function checkResultHtml(correct, message) {
+  return '<div class="check-result ' + (correct ? 'ok' : 'no') + '">' +
+    '<span class="check-result-icon">' + (correct ? '✓' : '✗') + '</span> ' +
+    message +
+    '</div>';
+}
 function renderCheckResult(targetEl, result) {
   if (!targetEl) return;
-  targetEl.innerHTML =
-    '<div class="check-result ' + (result.correct ? 'ok' : 'no') + '">' +
-      '<span class="check-result-icon">' + (result.correct ? '✓' : '✗') + '</span> ' +
-      result.message +
-    '</div>';
+  targetEl.innerHTML = checkResultHtml(result.correct, result.message);
 }
 
 /* ============================================================
@@ -5604,15 +5612,73 @@ const SIEM_LOGS = [
 
 let lab4State = { triaged: {}, score: 0, done: false };
 
-// Investigation tasks for the SIEM lab, sequenced from GUIDED to INDEPENDENT
-// (the three objectives shown at the top of the lab, in order). The help each
-// task gives fades: task 1 shows the exact command and explains every part;
-// task 2 gives only a hint and makes the learner write it; task 3 states just
-// the goal. Each entry is still a spec for the reusable checkAnswer() above —
-// the extra fields (level/showCommand/explain/hintText) only drive rendering.
+// In-memory auth.log for the SIEM practice tasks. The learner's grep commands
+// are actually parsed and run against THIS data (see runAuthLogCmd), so they
+// see real output and correctness is based on the result — not keyword matching.
+// A brute force from 185.220.101.45 (many "Failed password"), one noise failure,
+// and a single legitimate "Accepted password" from an internal IP.
+const AUTH_LOG = [
+  'Sep 14 02:14:29 hotel-vpn sshd[20881]: Failed password for admin from 185.220.101.45 port 51014 ssh2',
+  'Sep 14 02:14:31 hotel-vpn sshd[20881]: Failed password for admin from 185.220.101.45 port 51020 ssh2',
+  'Sep 14 02:14:33 hotel-vpn sshd[20883]: Failed password for root from 185.220.101.45 port 51022 ssh2',
+  'Sep 14 02:14:34 hotel-vpn sshd[20883]: Failed password for root from 185.220.101.45 port 51026 ssh2',
+  'Sep 14 02:14:36 hotel-vpn sshd[20885]: Failed password for admin from 185.220.101.45 port 51030 ssh2',
+  'Sep 14 02:14:38 hotel-vpn sshd[20885]: Failed password for guest from 185.220.101.45 port 51033 ssh2',
+  'Sep 14 02:14:40 hotel-vpn sshd[20887]: Failed password for root from 185.220.101.45 port 51037 ssh2',
+  'Sep 14 02:14:41 hotel-vpn sshd[20887]: Failed password for admin from 185.220.101.45 port 51041 ssh2',
+  'Sep 14 02:14:43 hotel-vpn sshd[20889]: Failed password for oracle from 185.220.101.45 port 51048 ssh2',
+  'Sep 14 02:14:45 hotel-vpn sshd[20889]: Failed password for admin from 185.220.101.45 port 51052 ssh2',
+  'Sep 14 02:14:47 hotel-vpn sshd[20891]: Failed password for root from 185.220.101.45 port 51057 ssh2',
+  'Sep 14 02:14:49 hotel-vpn sshd[20891]: Failed password for postgres from 185.220.101.45 port 51061 ssh2',
+  'Sep 14 02:15:07 hotel-vpn sshd[20903]: Failed password for jdoe from 203.0.113.7 port 44120 ssh2',
+  'Sep 14 02:15:22 hotel-vpn sshd[20912]: Accepted password for jdoe from 10.0.4.12 port 44130 ssh2',
+  'Sep 14 02:15:23 hotel-vpn sshd[20912]: pam_unix(sshd:session): session opened for user jdoe',
+];
+// Expected results, derived from the data so they never drift out of sync.
+const AUTH_FAILED_COUNT = AUTH_LOG.filter(function (l) { return l.indexOf('Failed password') > -1; }).length;
+const AUTH_ACCEPTED_COUNT = AUTH_LOG.filter(function (l) { return l.indexOf('Accepted password') > -1; }).length;
+
+function _siemEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Tiny shell: supports exactly  grep "PATTERN" auth.log  with an optional | wc -l.
+// Returns { ok, pattern, isCount, lines, count } or { ok:false } for anything else.
+function runAuthLogCmd(raw) {
+  const m = String(raw).trim().match(/^grep\s+(["'])(.+?)\1\s+auth\.log\s*(?:\|\s*wc\s+-l\s*)?$/);
+  if (!m) return { ok: false };
+  const pattern = m[2];
+  const isCount = /\|\s*wc\s+-l\s*$/.test(String(raw).trim());
+  const lines = AUTH_LOG.filter(function (l) { return l.indexOf(pattern) > -1; }); // grep is case-sensitive
+  return { ok: true, pattern: pattern, isCount: isCount, lines: lines, count: lines.length };
+}
+
+function renderAuthOutput(raw, res) {
+  var body;
+  if (res.isCount) body = String(res.count);
+  else if (res.lines.length === 0) body = '(no matching lines)';
+  else body = res.lines.map(_siemEsc).join('\n');
+  return '<div class="siem-output">' +
+    '<div class="siem-output-cmd">$ ' + _siemEsc(String(raw).trim()) + '</div>' +
+    '<pre class="siem-output-body">' + body + '</pre></div>';
+}
+
+function renderAuthNote() {
+  return '<div class="siem-note">This lab runs a mini shell that supports <code>grep</code> on <code>auth.log</code>. Try, for example:<br>' +
+    '<code>grep "Failed password" auth.log</code> &nbsp;or&nbsp; <code>grep "Failed password" auth.log | wc -l</code></div>';
+}
+
+// Investigation tasks for the SIEM lab, sequenced from GUIDED to INDEPENDENT.
+// Tasks 1-2 (type:'command') actually RUN the learner's grep against AUTH_LOG
+// via runAuthLogCmd — correctness is based on the real result their command
+// produces (see spec.correct(res)), and the real output is rendered. Task 3
+// (type:'answer') is a value the learner deduces, still validated by the
+// reusable checkAnswer(). Extra fields (level/showCommand/explain/hintText)
+// only drive rendering.
 const SIEM_CHECKS = [
   {
-    // TASK 1 — GUIDED: exact command shown + each part explained.
+    // TASK 1 — GUIDED: exact command shown + each part explained. It RUNS.
+    type: 'command',
     level: 'Guided',
     prompt: 'Count the failed logins straight from the raw auth log. Run the command below:',
     showCommand: 'grep "Failed password" auth.log | wc -l',
@@ -5623,28 +5689,32 @@ const SIEM_CHECKS = [
       ['| wc -l', 'pipes the matches into wc -l, which counts the matching lines'],
     ],
     placeholder: 'type the command shown above',
-    accept: function (n) { return n.indexOf('grep') > -1 && n.indexOf('failed password') > -1 && n.indexOf('auth.log') > -1 && n.indexOf('wc -l') > -1; },
-    right: 'Exactly — that returns a flood of failed logins from a single source, which is the signature of a brute-force attack. You just detected one straight from the raw logs.',
-    hint: 'Not quite — type the command exactly as shown above: grep "Failed password" auth.log | wc -l. Each piece matters: the pattern in quotes, the log file, and | wc -l to count.',
+    // Correct = the command actually returns the count of failed logins.
+    correct: function (res) { return res.isCount && res.count === AUTH_FAILED_COUNT; },
+    right: 'Exactly — your command counted every failed login, and that flood almost all from 185.220.101.45 is the signature of a brute-force attack. You detected it straight from the raw log.',
+    hint: 'Not quite — look at the number your command returned. To COUNT the failed logins you need the exact pattern the log writes and the counter pipe: grep "Failed password" auth.log | wc -l.',
   },
   {
-    // TASK 2 — MIDDLE: hint only; the learner writes the command themselves.
+    // TASK 2 — YOUR TURN: hint only; the learner writes the command. It RUNS.
+    type: 'command',
     level: 'Your turn',
     prompt: 'Now find the SUCCESSFUL logins — did the attacker actually get in? Write the command yourself (no answer shown this time).',
     hintText: 'Same tool and same file as task 1 — only the search phrase changes. The log writes "Accepted password" when a login succeeds.',
     placeholder: 'write your grep command',
-    accept: function (n) { return n.indexOf('grep') > -1 && n.indexOf('accepted password') > -1 && n.indexOf('auth.log') > -1; },
-    right: 'Correct — grep "Accepted password" auth.log lists the logins that succeeded, so you can tell in seconds whether the brute force broke through. That is distinguishing failed vs. successful logins at scale.',
-    hint: 'Not quite — reuse the pattern from task 1, but swap "Failed password" for "Accepted password" (and you can drop | wc -l to see the actual entries): grep "Accepted password" auth.log',
+    // Correct = the command isolates exactly the successful-login line(s).
+    correct: function (res) { return res.lines.length === AUTH_ACCEPTED_COUNT && res.lines.every(function (l) { return l.indexOf('Accepted password') > -1; }); },
+    right: 'Correct — the only success is jdoe from an internal IP (10.0.4.12). The brute force from 185.220.101.45 never broke through, and your command showed that in one line. That is distinguishing failed vs. successful logins at scale.',
+    hint: 'Not quite — read the lines your command returned. To isolate the successful logins, reuse task 1 but search for what the log writes on success: grep "Accepted password" auth.log.',
   },
   {
-    // TASK 3 — INDEPENDENT: goal only, no command, no walkthrough.
+    // TASK 3 — ON YOUR OWN: goal only; a value the learner deduces.
+    type: 'answer',
     level: 'On your own',
     prompt: "Find the attacker's IP — the source behind the brute-force attempts. No command and no hint this time; apply what you have learned.",
     placeholder: 'enter the attacker IP',
     accept: ['185.220.101.45'],
     right: "Correct — 185.220.101.45 is the brute-force source. You found it unaided: read the failed-login evidence, isolated the offending source, and identified exactly what to block. That is the core SOC triage loop.",
-    hint: "Not quite — go back to the failed-login evidence and read the SOURCE IP of the host generating the burst of failures. It is the public address (not an internal 192.168.x / 10.x one) tied to the 47 attempts in 60 seconds.",
+    hint: "Not quite — go back to the failed-login lines (run grep \"Failed password\" auth.log above if you need to) and read the SOURCE IP generating the burst. It is the public address, not an internal 192.168.x / 10.x one.",
   },
 ];
 
@@ -5682,10 +5752,22 @@ function renderSiemChecksHtml() {
 }
 
 function submitSiemCheck(i) {
+  const spec = SIEM_CHECKS[i];
   const input = document.getElementById('siemCheck' + i);
-  if (!input || !input.value.trim()) return;
-  const result = checkAnswer(input.value, SIEM_CHECKS[i]);
-  renderCheckResult(document.getElementById('siemCheckFb' + i), result);
+  const fb = document.getElementById('siemCheckFb' + i);
+  if (!input || !fb || !input.value.trim()) return;
+  const raw = input.value;
+
+  if (spec.type === 'command') {
+    // Actually parse + run the command against AUTH_LOG and show the real output.
+    const res = runAuthLogCmd(raw);
+    if (!res.ok) { fb.innerHTML = renderAuthNote(); return; }
+    const correct = !!spec.correct(res);
+    fb.innerHTML = renderAuthOutput(raw, res) + checkResultHtml(correct, correct ? spec.right : spec.hint);
+    return;
+  }
+  // Answer task (e.g. the attacker IP) — reuse the checkAnswer core.
+  renderCheckResult(fb, checkAnswer(raw, spec));
 }
 
 // CAPSTONE — a fresh incident on a different server with NO hints. The learner
