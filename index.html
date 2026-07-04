@@ -1441,6 +1441,12 @@
     /* "What this miss costs" consequence shown on a WRONG triage call */
     .lab4-consequence { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,71,87,.28); font-size: 12px; line-height: 1.6; }
     .lab4-consequence-k { color: var(--danger); font-weight: 700; }
+    /* Warm-up hook (a taste of the terminal before triage) */
+    .lab4-hook { margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.02); }
+    .lab4-hook-lead { font-size: 12.5px; color: var(--text); line-height: 1.5; margin-bottom: 9px; }
+    .lab4-hook-note { margin-top: 9px; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+    /* Phase label — matches the other cyan section titles so each step reads clearly */
+    .siem-phase { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin: 4px 0 10px; }
     /* Investigation check-answer step (SIEM lab) */
     .siem-checks { margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.02); }
     .siem-checks-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin-bottom: 14px; }
@@ -5803,6 +5809,18 @@ function submitSiemCheck(i) {
   renderCheckResult(fb, checkAnswer(raw, spec));
 }
 
+// Warm-up hook shown above the triage queue — one click runs a real grep so the
+// terminal work isn't buried below the whole triage scroll. Reuses the engine.
+function submitLab4Hook() {
+  const input = document.getElementById('lab4HookInput');
+  const fb = document.getElementById('lab4HookFb');
+  if (!input || !fb || !input.value.trim()) return;
+  const res = runAuthLogCmd(input.value);
+  if (!res.ok) { fb.innerHTML = renderAuthNote(); return; }
+  fb.innerHTML = renderAuthOutput(input.value, res) +
+    '<div class="lab4-hook-note">Those are the brute-force attempts hitting the server. Triage the full alert queue below — then you\'ll run commands like this yourself.</div>';
+}
+
 // Synthesis question, shown right after triage and BEFORE the practice ladder:
 // makes the learner CORRELATE two alerts into one attack chain instead of
 // judging each alone. 192.168.1.55 is the source of both the /etc/passwd File
@@ -5917,8 +5935,13 @@ function submitLab4Capstone() {
 }
 
 function renderLab4() {
-  lab4State = { triaged: {}, score: 0, done: false };
+  // Full clean reset for RETRY: triage state, capstone flag, and the progress bar.
+  lab4State = { triaged: {}, score: 0, done: false, capstoneDone: false };
+  const p = document.getElementById('prog-4');
+  if (p) p.style.width = '0%';
   renderLab4Table();
+  const c = document.getElementById('labContent');
+  if (c) c.scrollIntoView({ block: 'start' });
 }
 
 function renderLab4Table() {
@@ -5964,6 +5987,15 @@ function renderLab4Table() {
         <li>Identify the source IP of an attack</li>
       </ul>
     </div>
+    <div class="lab4-hook">
+      <div class="lab4-hook-lead"><b>Warm-up.</b> Before you triage, run this to see the raw attack in the log:</div>
+      <div class="siem-check-row">
+        <input id="lab4HookInput" class="siem-check-input" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" value='grep "Failed password" auth.log' onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab4Hook();}">
+        <button class="btn btn-cyan siem-check-btn" onclick="submitLab4Hook()">Run</button>
+      </div>
+      <div id="lab4HookFb"></div>
+    </div>
+    <div class="siem-phase">Triage the alert queue</div>
     <div class="siem-progress">Triaged: <span>${triaged}</span> / <span>8</span> &nbsp;|&nbsp; Correct: <span>${lab4State.score}</span> &nbsp;|&nbsp; Score: <span>${lab4State.score * 10} pts</span></div>
     <div class="labtool dark">
       <div class="labtool-bar">
