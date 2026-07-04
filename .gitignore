@@ -1,0 +1,26 @@
+# ---- Secrets: never commit these ----
+# Real secrets (Airtable token, JWT secret, access codes) live in Netlify
+# environment variables, NOT in the repo. Keep any local copies out of git.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+**/secrets.json
+
+# ---- Dependencies ----
+node_modules/
+
+# ---- Netlify build output & local link state ----
+# Bundled function .zips + local site-link state; regenerated on every deploy.
+.netlify/
+
+# ---- Local tooling config (contains machine-specific absolute paths) ----
+.claude/
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
