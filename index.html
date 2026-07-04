@@ -1442,6 +1442,15 @@
     .siem-check-input { flex: 1 1 200px; min-width: 0; background: #0a0d13; border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; color: var(--text); font-family: var(--font); font-size: 12.5px; }
     .siem-check-input:focus { outline: none; border-color: var(--cyan); }
     .siem-check-btn { white-space: nowrap; }
+    .siem-checks-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin: -8px 0 16px; }
+    .siem-check-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .siem-check-num { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; color: var(--cyan); }
+    .siem-check-level { font-size: 9px; letter-spacing: .5px; text-transform: uppercase; font-weight: 700; color: var(--muted); border: 1px solid var(--border); border-radius: 20px; padding: 1px 8px; }
+    .siem-cmd { font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 12px; background: #0a0d13; border: 1px solid var(--border); border-radius: 4px; padding: 8px 11px; color: var(--green); margin-bottom: 8px; overflow-x: auto; }
+    .siem-explain { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .siem-explain li { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+    .siem-explain code { color: var(--text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; }
+    .siem-hint-text { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; font-style: italic; }
     /* Reusable check-answer result (portable to other labs) */
     .check-result { margin-top: 9px; padding: 11px 13px; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: var(--text); }
     .check-result.ok { border: 1px solid var(--green); background: rgba(52,227,160,.08); }
@@ -5586,39 +5595,79 @@ const SIEM_LOGS = [
 
 let lab4State = { triaged: {}, score: 0, done: false };
 
-// Investigation check-answer questions for the SIEM lab. Each entry is a spec
-// for the reusable checkAnswer() above. Note the two `accept` forms: an exact
-// list (IP) and a predicate that tolerates "47", "47 attempts", etc. (count).
+// Investigation tasks for the SIEM lab, sequenced from GUIDED to INDEPENDENT
+// (the three objectives shown at the top of the lab, in order). The help each
+// task gives fades: task 1 shows the exact command and explains every part;
+// task 2 gives only a hint and makes the learner write it; task 3 states just
+// the goal. Each entry is still a spec for the reusable checkAnswer() above —
+// the extra fields (level/showCommand/explain/hintText) only drive rendering.
 const SIEM_CHECKS = [
   {
-    prompt: 'Which source IP is running the brute-force login attack?',
-    placeholder: 'e.g. 203.0.113.5',
-    accept: ['185.220.101.45'],
-    right: 'Correct — 185.220.101.45 is the brute-force source (a known Tor exit-node range). You picked the external IP behind the burst of failed logins; the real next move is to block it at the firewall and lock the targeted account.',
-    hint: 'Not quite — look for the HIGH-severity "Failed Login" alert with 47 attempts in 60 seconds. The attacker\'s address is in the SOURCE IP column, and it is a public address — not an internal 192.168.x or 10.x one.',
+    // TASK 1 — GUIDED: exact command shown + each part explained.
+    level: 'Guided',
+    prompt: 'Count the failed logins straight from the raw auth log. Run the command below:',
+    showCommand: 'grep "Failed password" auth.log | wc -l',
+    explain: [
+      ['grep', 'searches a file for lines matching a pattern'],
+      ['"Failed password"', 'the exact phrase the log writes on every failed login'],
+      ['auth.log', 'the authentication log file you are searching'],
+      ['| wc -l', 'pipes the matches into wc -l, which counts the matching lines'],
+    ],
+    placeholder: 'type the command shown above',
+    accept: function (n) { return n.indexOf('grep') > -1 && n.indexOf('failed password') > -1 && n.indexOf('auth.log') > -1 && n.indexOf('wc -l') > -1; },
+    right: 'Exactly — that returns a flood of failed logins from a single source, which is the signature of a brute-force attack. You just detected one straight from the raw logs.',
+    hint: 'Not quite — type the command exactly as shown above: grep "Failed password" auth.log | wc -l. Each piece matters: the pattern in quotes, the log file, and | wc -l to count.',
   },
   {
-    prompt: 'How many failed login attempts did that source make in 60 seconds?',
-    placeholder: 'a number',
-    accept: function (n) { return n.replace(/\D/g, '') === '47'; },
-    right: 'Correct — 47 failed attempts in 60 seconds is far faster than any human could type, which is exactly what separates a brute-force attack from someone who simply forgot their password.',
-    hint: 'Not quite — read the DETAILS column of the brute-force alert (from 185.220.101.45); it states the number of failed logins in the 60-second window. In raw logs you would filter for the failed-login events first, then count — e.g. grep "Failed password" auth.log | wc -l — so check what you are filtering on before counting.',
+    // TASK 2 — MIDDLE: hint only; the learner writes the command themselves.
+    level: 'Your turn',
+    prompt: 'Now find the SUCCESSFUL logins — did the attacker actually get in? Write the command yourself (no answer shown this time).',
+    hintText: 'Same tool and same file as task 1 — only the search phrase changes. The log writes "Accepted password" when a login succeeds.',
+    placeholder: 'write your grep command',
+    accept: function (n) { return n.indexOf('grep') > -1 && n.indexOf('accepted password') > -1 && n.indexOf('auth.log') > -1; },
+    right: 'Correct — grep "Accepted password" auth.log lists the logins that succeeded, so you can tell in seconds whether the brute force broke through. That is distinguishing failed vs. successful logins at scale.',
+    hint: 'Not quite — reuse the pattern from task 1, but swap "Failed password" for "Accepted password" (and you can drop | wc -l to see the actual entries): grep "Accepted password" auth.log',
+  },
+  {
+    // TASK 3 — INDEPENDENT: goal only, no command, no walkthrough.
+    level: 'On your own',
+    prompt: "Find the attacker's IP — the source behind the brute-force attempts. No command and no hint this time; apply what you have learned.",
+    placeholder: 'enter the attacker IP',
+    accept: ['185.220.101.45'],
+    right: "Correct — 185.220.101.45 is the brute-force source. You found it unaided: read the failed-login evidence, isolated the offending source, and identified exactly what to block. That is the core SOC triage loop.",
+    hint: "Not quite — go back to the failed-login evidence and read the SOURCE IP of the host generating the burst of failures. It is the public address (not an internal 192.168.x / 10.x one) tied to the 47 attempts in 60 seconds.",
   },
 ];
 
 function renderSiemChecksHtml() {
   return `
     <div class="siem-checks">
-      <div class="siem-checks-title">Investigation check — prove you can read the logs</div>
-      ${SIEM_CHECKS.map(function (c, i) { return `
+      <div class="siem-checks-title">Practice — from guided to on your own</div>
+      <div class="siem-checks-sub">Each task gives a little less help than the last. By the final one, you are working unaided.</div>
+      ${SIEM_CHECKS.map(function (c, i) {
+        var help = '';
+        if (c.showCommand) {
+          help += '<div class="siem-cmd">' + c.showCommand + '</div>';
+          if (c.explain) {
+            help += '<ul class="siem-explain">' + c.explain.map(function (p) {
+              return '<li><code>' + p[0] + '</code> — ' + p[1] + '</li>';
+            }).join('') + '</ul>';
+          }
+        } else if (c.hintText) {
+          help += '<div class="siem-hint-text">Hint: ' + c.hintText + '</div>';
+        }
+        return `
         <div class="siem-check">
+          <div class="siem-check-head"><span class="siem-check-num">Task ${i + 1}</span><span class="siem-check-level">${c.level}</span></div>
           <label class="siem-check-q" for="siemCheck${i}">${c.prompt}</label>
+          ${help}
           <div class="siem-check-row">
             <input id="siemCheck${i}" class="siem-check-input" type="text" placeholder="${c.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitSiemCheck(${i});}">
             <button class="btn btn-cyan siem-check-btn" onclick="submitSiemCheck(${i})">Check answer</button>
           </div>
           <div id="siemCheckFb${i}"></div>
-        </div>`; }).join('')}
+        </div>`;
+      }).join('')}
     </div>
   `;
 }
