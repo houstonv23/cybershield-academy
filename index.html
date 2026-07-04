@@ -1426,6 +1426,12 @@
     .siem-details td { white-space: normal; }
     .siem-progress { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
     .siem-progress span { color: var(--cyan); }
+    /* "What you'll be able to do" objectives box (SIEM lab) */
+    .siem-goals { margin-bottom: 16px; padding: 14px 16px; border: 1px solid var(--border); border-left: 3px solid var(--cyan); border-radius: 6px; background: rgba(56,189,248,.05); }
+    .siem-goals-title { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin-bottom: 9px; }
+    .siem-goals-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .siem-goals-list li { position: relative; padding-left: 20px; font-size: 12.5px; color: var(--text); line-height: 1.45; }
+    .siem-goals-list li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
     /* Investigation check-answer step (SIEM lab) */
     .siem-checks { margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.02); }
     .siem-checks-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin-bottom: 14px; }
@@ -5657,6 +5663,14 @@ function renderLab4Table() {
   }).join('');
 
   content.innerHTML = `
+    <div class="siem-goals">
+      <div class="siem-goals-title">What you'll be able to do</div>
+      <ul class="siem-goals-list">
+        <li>Detect a brute-force attack from raw auth logs</li>
+        <li>Distinguish failed vs. successful logins at scale</li>
+        <li>Identify the source IP of an attack</li>
+      </ul>
+    </div>
     <div class="siem-progress">Triaged: <span>${triaged}</span> / <span>8</span> &nbsp;|&nbsp; Correct: <span>${lab4State.score}</span> &nbsp;|&nbsp; Score: <span>${lab4State.score * 10} pts</span></div>
     <div class="labtool dark">
       <div class="labtool-bar">
