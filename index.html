@@ -1451,6 +1451,15 @@
     .siem-explain li { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
     .siem-explain code { color: var(--text); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; }
     .siem-hint-text { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; font-style: italic; }
+    /* Capstone — the graded, no-hints assessment that completes the lab */
+    .lab4-capstone { margin-top: 22px; padding: 18px; border: 1px solid var(--warning); border-radius: 8px; background: rgba(251,191,36,.05); }
+    .capstone-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .capstone-badge { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 800; color: #0a0d13; background: var(--warning); border-radius: 3px; padding: 3px 9px; }
+    .capstone-note { font-size: 11.5px; color: var(--warning); font-weight: 600; }
+    .capstone-prompt { font-size: 13.5px; color: var(--text); font-weight: 600; margin-bottom: 12px; line-height: 1.5; }
+    .capstone-scenario-title { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .capstone-log { margin: 0 0 14px; padding: 11px 13px; background: #0a0d13; border: 1px solid var(--border); border-radius: 4px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; line-height: 1.7; color: var(--muted); overflow-x: auto; white-space: pre; }
+    .capstone-q { display: block; font-size: 12.5px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
     /* Reusable check-answer result (portable to other labs) */
     .check-result { margin-top: 9px; padding: 11px 13px; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: var(--text); }
     .check-result.ok { border: 1px solid var(--green); background: rgba(52,227,160,.08); }
@@ -5679,6 +5688,64 @@ function submitSiemCheck(i) {
   renderCheckResult(document.getElementById('siemCheckFb' + i), result);
 }
 
+// CAPSTONE — a fresh incident on a different server with NO hints. The learner
+// must apply the whole workflow cold (spot the brute force, separate the one
+// successful login from the failures, name the compromised account). Passing
+// THIS is what completes the lab and earns its XP. On a wrong answer it gives
+// no teaching hint — this is the assessment, not practice.
+const LAB4_CAPSTONE = {
+  // Fresh scenario: a raw auth.log burst — many failures from one IP, then one
+  // success. The compromised account is the one on the "Accepted password" line.
+  scenarioTitle: 'web-app-02 · auth.log (new alert — brute force suspected)',
+  scenarioLog:
+    'Oct 02 03:11:07 web-app-02 sshd[4471]: Failed password for admin from 198.51.100.66 port 42310 ssh2\n' +
+    'Oct 02 03:11:08 web-app-02 sshd[4471]: Failed password for admin from 198.51.100.66 port 42312 ssh2\n' +
+    'Oct 02 03:11:10 web-app-02 sshd[4473]: Failed password for root from 198.51.100.66 port 42320 ssh2\n' +
+    'Oct 02 03:11:11 web-app-02 sshd[4473]: Failed password for root from 198.51.100.66 port 42322 ssh2\n' +
+    'Oct 02 03:11:13 web-app-02 sshd[4475]: Failed password for deploy from 198.51.100.66 port 42330 ssh2\n' +
+    'Oct 02 03:11:15 web-app-02 sshd[4475]: Failed password for deploy from 198.51.100.66 port 42332 ssh2\n' +
+    'Oct 02 03:11:18 web-app-02 sshd[4477]: Accepted password for deploy from 198.51.100.66 port 42340 ssh2\n' +
+    'Oct 02 03:11:20 web-app-02 sshd[4477]: session opened for user deploy',
+  question: 'Which user account did the attacker successfully break into?',
+  placeholder: 'account name',
+  accept: function (n) { return n.indexOf('deploy') > -1; },
+  right: 'Correct — the flood of failed logins from 198.51.100.66 is the brute force, and the single "Accepted password" line shows it finally succeeded on the deploy account. You worked a fresh incident end to end with no help — that is the real skill this lab teaches.',
+  hint: 'Not correct — re-read the excerpt and investigate again. No hints on the capstone: this is where you prove you can do it unaided.',
+};
+
+function renderLab4CapstoneHtml() {
+  return `
+    <div class="lab4-capstone">
+      <div class="capstone-head">
+        <span class="capstone-badge">Capstone</span>
+        <span class="capstone-note">Completing this earns your XP and lab completion — no hints.</span>
+      </div>
+      <div class="capstone-prompt">A new alert just fired on a different server — investigate it cold and apply the full workflow.</div>
+      <div class="capstone-scenario-title">${LAB4_CAPSTONE.scenarioTitle}</div>
+      <pre class="capstone-log">${LAB4_CAPSTONE.scenarioLog}</pre>
+      <label class="capstone-q" for="lab4CapstoneInput">${LAB4_CAPSTONE.question}</label>
+      <div class="siem-check-row">
+        <input id="lab4CapstoneInput" class="siem-check-input" type="text" placeholder="${LAB4_CAPSTONE.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab4Capstone();}">
+        <button class="btn btn-green capstone-btn" onclick="submitLab4Capstone()">Submit &amp; complete lab</button>
+      </div>
+      <div id="lab4CapstoneFb"></div>
+    </div>
+  `;
+}
+
+function submitLab4Capstone() {
+  const input = document.getElementById('lab4CapstoneInput');
+  const fb = document.getElementById('lab4CapstoneFb');
+  if (!input || !input.value.trim()) return;
+  const result = checkAnswer(input.value, LAB4_CAPSTONE);
+  renderCheckResult(fb, result);
+  if (result.correct) {
+    // Passing the capstone is what completes the lab and earns the XP.
+    awardPoints(30);
+    setTimeout(function () { finishLab4(); }, 800);
+  }
+}
+
 function renderLab4() {
   lab4State = { triaged: {}, score: 0, done: false };
   renderLab4Table();
@@ -5739,7 +5806,7 @@ function renderLab4Table() {
       </div>
     </div>
     <div id="lab4Feedback" style="margin-top:16px;"></div>
-    ${triaged === 8 ? renderSiemChecksHtml() + `<div class="action-btns"><button class="btn btn-cyan" onclick="finishLab4()">Finish lab →</button></div>` : ''}
+    ${triaged === 8 ? renderSiemChecksHtml() + renderLab4CapstoneHtml() : ''}
   `;
 }
 
@@ -5768,22 +5835,26 @@ function answerLab4(idx, choice) {
   }, 50);
 }
 
+// Called only when the CAPSTONE is cleared — passing it is what completes the
+// lab. Record a passing score (at least the pass mark) so the completion sticks
+// through healLabCompletions and the next lab unlocks.
 function finishLab4() {
   stopTimer();
-  const passed = lab4State.score >= 6;
-  completeLabFinish(4, lab4State.score, 8);
+  const total = 8;
+  const finalScore = Math.max(lab4State.score, labPassMark(total));
+  completeLabFinish(4, finalScore, total);
   document.getElementById('prog-4').style.width = '100%';
   document.getElementById('labContent').innerHTML = `
     <div class="lab-complete">
       <div class="lc-icon"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M5 9a3 3 0 0 1-3-3V5h3M19 9a3 3 0 0 0 3-3V5h-3"/></svg></div>
-      <h3>${passed ? 'LAB COMPLETE' : 'LAB COMPLETE — REVIEW NEEDED'}</h3>
+      <h3>LAB COMPLETE — CAPSTONE CLEARED</h3>
       <div class="score-big">${lab4State.score} / 8</div>
-      <p>${passed ? 'Excellent triage skills.' : 'You need 6/8 to pass — review the explanations and retry.'}<br/>
+      <p>You investigated a fresh incident with no hints and reached the right answer — that is what earns this lab.<br/>
       Key takeaways: Context is everything in SIEM triage. Cross-reference alerts across<br/>
       time windows — the /etc/passwd read and lateral movement came from the same IP.<br/>
       Alert fatigue is real: dismissing legitimate low-severity noise is as important as escalating threats.</p>
       <div class="action-btns" style="justify-content:center;margin-top:24px;">
-        ${passed ? `<button class="btn btn-cyan" onclick="openLab(5)">UNLOCK PACKET ANALYSIS</button>` : ''}
+        <button class="btn btn-cyan" onclick="openLab(5)">UNLOCK PACKET ANALYSIS</button>
         <button class="btn btn-green" onclick="renderLab4()">RETRY</button>
         <button class="btn btn-warning" onclick="exportStudyNotes(4)">EXPORT STUDY NOTES</button>
       </div>
