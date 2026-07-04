@@ -673,7 +673,15 @@
       color: #52525b;
       line-height: 1.65;
       max-width: 480px;
-      margin-bottom: 36px;
+      margin-bottom: 14px;
+    }
+    /* Outcome line — slightly smaller than the subhead; a capability, not a promise */
+    .hero-outcome {
+      font-size: 15px;
+      color: #52525b;
+      line-height: 1.55;
+      max-width: 480px;
+      margin: 0 0 34px;
     }
     .hero-btns {
       display: flex;
@@ -747,7 +755,7 @@
     .ht-live { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; letter-spacing:.6px; color:#34e3a0; background:rgba(52,227,160,.1); border:1px solid rgba(52,227,160,.3); padding:3px 9px; border-radius:20px; }
     .ht-live-dot { width:6px; height:6px; border-radius:50%; background:#34e3a0; animation:htPulse 1.4s ease-in-out infinite; }
     @keyframes htPulse { 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
-    .ht-body { padding:16px 18px; font-size:13px; line-height:1.85; min-height:210px; }
+    .ht-body { padding:16px 18px; font-size:13px; line-height:1.85; min-height:210px; max-height:280px; overflow-y:auto; }
     .ht-l { opacity:0; animation:htReveal .38s ease forwards; white-space:pre-wrap; word-break:break-word; color:#cfe0d6; }
     .ht-l1{ animation-delay:.35s; } .ht-l2{ animation-delay:1.15s; } .ht-l3{ animation-delay:2.0s; }
     .ht-l4{ animation-delay:2.85s; } .ht-l5{ animation-delay:3.7s; } .ht-l6{ animation-delay:4.4s; }
@@ -760,6 +768,12 @@
     @keyframes htBlink { 0%,100%{ opacity:1; } 50%{ opacity:0; } }
     .ht-caption { padding:13px 18px 15px; background:#11161f; border-top:1px solid rgba(255,255,255,.06); font-family:var(--sans,'Inter',sans-serif); font-size:12.5px; line-height:1.55; color:#9fb0c3; }
     .ht-caption-k { color:#fff; font-weight:600; }
+    /* Interactive hero terminal — one sandboxed command */
+    .ht-cmd-hint { cursor:pointer; }
+    .ht-cmd-hint:hover { color:#fff; }
+    .ht-prompt { display:flex; align-items:center; gap:8px; color:#cfe0d6; }
+    .ht-input { flex:1 1 auto; min-width:0; background:transparent; border:none; outline:none; color:#cfe0d6; font-family:inherit; font-size:13px; line-height:1.85; caret-color:#35d07f; padding:0; }
+    .ht-input::placeholder { color:#4a5a6d; }
 
     /* See-it-in-action showcase */
     .showcase-section { padding:80px 24px; background:#fbfcfd; border-top:1px solid #edf0f4; border-bottom:1px solid #edf0f4; }
@@ -2209,6 +2223,7 @@
         </div>
         <h1 class="hero-h1">Learn cybersecurity by<br><em>doing</em> it &mdash; not<br>watching it.</h1>
         <p class="hero-sub">Hands-on simulation labs for curious beginners, career changers, schools, and security teams. No software to install. Results from day one.</p>
+        <p class="hero-outcome">Build the real skills to pass CompTIA Security+ and step into your first security role.</p>
         <div class="hero-btns">
           <button class="hero-btn-primary" onclick="handleGetStarted()">Get Started Free</button>
           <button class="hero-btn-ghost" onclick="document.getElementById('see-it').scrollIntoView({behavior:'smooth'})">See It in Action &rarr;</button>
@@ -2231,8 +2246,8 @@
         </div>
         <div class="hero-trust">
           <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> No credit card required</span>
-          <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> FERPA compliant</span>
-          <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> SOC 2 aligned</span>
+          <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> Security+ aligned</span>
+          <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> Start in 30 seconds</span>
         </div>
       </div>
       <!-- Right col: dashboard mockup -->
@@ -2242,13 +2257,15 @@
           <span class="ht-title">analyst@siem — Lab 2: SIEM Log Triage</span>
           <span class="ht-live"><span class="ht-live-dot"></span>LIVE LAB</span>
         </div>
-        <div class="ht-body">
-          <div class="ht-l ht-l1"><span class="ht-p">analyst@siem:~$</span> grep "Failed password" auth.log | wc -l</div>
-          <div class="ht-l ht-l2 ht-out"><span class="ht-warn">841</span>  <span class="ht-dim"># 841 failed logins from one IP in 6 min — brute force</span></div>
-          <div class="ht-l ht-l3"><span class="ht-p">analyst@siem:~$</span> grep "Accepted password" auth.log</div>
-          <div class="ht-l ht-l4 ht-out"><span class="ht-ok">Accepted password</span> for backup from 45.148.10.72 ssh2</div>
-          <div class="ht-l ht-l5 ht-breach">⚠ BREACH CONFIRMED — attacker guessed the "backup" account</div>
-          <div class="ht-l ht-l6"><span class="ht-p">analyst@siem:~$</span> <span class="ht-cursor"></span></div>
+        <div class="ht-body" id="heroTermBody">
+          <div class="ht-l ht-dim"># SIEM log triage — someone is hammering the login. Find it.</div>
+          <div class="ht-l ht-dim"># Type this command and press Enter:</div>
+          <div class="ht-l ht-cmd-hint" onclick="heroTermFill()"><span class="ht-p">analyst@siem:~$</span> grep "Failed password" auth.log | wc -l</div>
+          <div id="heroTermOut"></div>
+          <div class="ht-prompt">
+            <span class="ht-p">analyst@siem:~$</span>
+            <input id="heroTermInput" class="ht-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type the command above&hellip;" aria-label="Try one terminal command" onkeydown="if(event.key==='Enter'){heroTermRun();}" />
+          </div>
         </div>
         <div class="ht-caption"><span class="ht-caption-k">You're the analyst.</span> Type real commands, read real logs, and catch the intrusion — not another video to watch.</div>
       </div>
@@ -2283,6 +2300,43 @@
       </button>
     </div>
   </div>
+
+  <!-- How it works -->
+  <section class="hiw-section">
+    <style>
+      .hiw-section { padding: 72px 24px; background: #fbfcfd; border-top: 1px solid #edf0f4; border-bottom: 1px solid #edf0f4; }
+      .hiw-inner { max-width: 1000px; margin: 0 auto; text-align: center; }
+      .hiw-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #2563eb; margin-bottom: 14px; }
+      .hiw-headline { font-family: var(--serif, Georgia, serif); font-size: 32px; line-height: 1.14; letter-spacing: -.02em; font-weight: 500; color: #111725; margin: 0 0 46px; }
+      .hiw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; text-align: left; }
+      .hiw-step { display: flex; flex-direction: column; gap: 12px; }
+      .hiw-num { width: 40px; height: 40px; border-radius: 50%; background: #eaf1ff; color: #2563eb; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+      .hiw-step-title { font-size: 16px; font-weight: 700; color: #111725; line-height: 1.35; }
+      .hiw-step-desc { font-size: 14px; color: #5b6577; line-height: 1.55; margin: 0; }
+      @media (max-width: 760px) { .hiw-grid { grid-template-columns: 1fr; gap: 22px; max-width: 380px; margin: 0 auto; } .hiw-headline { font-size: 26px; } }
+    </style>
+    <div class="hiw-inner">
+      <div class="hiw-eyebrow">How it works</div>
+      <h2 class="hiw-headline">Three steps from sign-up to certificate.</h2>
+      <div class="hiw-grid">
+        <div class="hiw-step">
+          <div class="hiw-num">1</div>
+          <div class="hiw-step-title">Take a 5-minute placement test</div>
+          <p class="hiw-step-desc">We meet you at your level.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">2</div>
+          <div class="hiw-step-title">Work through hands-on labs</div>
+          <p class="hiw-step-desc">Real terminals, real scenarios.</p>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">3</div>
+          <div class="hiw-step-title">Earn your certificate of completion</div>
+          <p class="hiw-step-desc">And prove what you can do.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- Trust bar -->
   <div class="trust-wrap">
@@ -2763,6 +2817,10 @@
           <button class="psch-btn" onclick="openInterestForm('school')">Book a walkthrough
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:18px;font-size:12.5px;color:#8792a3;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            FERPA-compliant data handling
+          </div>
         </div>
         <div class="psch-dash" aria-hidden="true">
           <div class="psch-dash-hd"><span class="psch-dash-title">Class progress &middot; CYBR&nbsp;101</span><span class="psch-dash-tag">Security+ track</span></div>
@@ -2809,13 +2867,17 @@
             <button class="pbiz-btn" onclick="openInterestForm('business')">Talk to us about team plans
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:18px;font-size:12.5px;color:#8792a3;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Working toward SOC 2 compliance (pilot stage)
+            </div>
           </div>
           <div class="tab-visual pbiz-dash-frame">
-            <div class="tab-visual-heading">Compliance Dashboard</div>
+            <div class="tab-visual-heading">Compliance Dashboard <span style="font-size:10px;font-weight:600;color:#a1a1aa;letter-spacing:.04em;text-transform:uppercase;">&middot; Illustrative</span></div>
             <div class="tab-bar-row"><span class="tab-bar-label">HIPAA</span><div class="tab-bar-track"><div class="tab-bar-fill full" style="width:100%"></div></div><span style="font-size:11px;color:#16a34a;font-weight:700;">100%</span></div>
             <div class="tab-bar-row"><span class="tab-bar-label">PCI DSS</span><div class="tab-bar-track"><div class="tab-bar-fill full" style="width:100%"></div></div><span style="font-size:11px;color:#16a34a;font-weight:700;">100%</span></div>
             <div class="tab-bar-row"><span class="tab-bar-label">SOC 2</span><div class="tab-bar-track"><div class="tab-bar-fill" style="width:88%"></div></div><span style="font-size:11px;color:#2563eb;font-weight:700;">88%</span></div>
-            <div class="tab-audit-line">Last audit: June 2026</div>
+            <div class="tab-audit-line">Self-assessment, in progress &mdash; not an audited result</div>
             <button class="tab-dl-btn">Download Report</button>
           </div>
         </div>
@@ -15408,19 +15470,58 @@ if (document.getElementById('app').style.display === 'flex') {
   try { updateAIDetectWidget(); } catch (e) {}
 }
 
-// Hero terminal replays the investigation on a loop — a continuously-playing
-// "demo" of solving a breach, so the landing always shows the product in motion.
-(function heroTermLoop() {
-  const body = document.querySelector('.hero-term .ht-body');
-  if (!body) return;
-  const lines = [].slice.call(body.querySelectorAll('.ht-l'));
-  if (!lines.length) return;
-  setInterval(function () {
-    lines.forEach(function (l) { l.style.animation = 'none'; });
-    void body.offsetWidth; // force reflow so the animation restarts
-    lines.forEach(function (l) { l.style.animation = ''; });
-  }, 11000);
-})();
+// Hero terminal — minimally interactive. A visitor can run the ONE sandboxed
+// command (grep "Failed password" auth.log | wc -l) and see the canned result,
+// before any signup. Anything else shows a friendly hint. Fully self-contained —
+// this does NOT touch the real in-app labs.
+function _heroTermEsc(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function _heroTermNorm(s) {
+  return (s || '').toLowerCase().trim()
+    .replace(/[‘’]/g, "'").replace(/[“”]/g, '"') // curly → straight quotes
+    .replace(/\s+/g, ' ');
+}
+function heroTermFill() {
+  const i = document.getElementById('heroTermInput');
+  if (i) { i.value = 'grep "Failed password" auth.log | wc -l'; i.focus(); }
+}
+function heroTermRun() {
+  const input = document.getElementById('heroTermInput');
+  const out = document.getElementById('heroTermOut');
+  const body = document.getElementById('heroTermBody');
+  if (!input || !out) return;
+  const raw = input.value;
+  const cmd = _heroTermNorm(raw);
+  if (!cmd) return;
+
+  // Echo the typed command (escaped — user input never hits innerHTML raw).
+  const echo = document.createElement('div');
+  echo.className = 'ht-l';
+  echo.innerHTML = '<span class="ht-p">analyst@siem:~$</span> ' + _heroTermEsc(raw);
+  out.appendChild(echo);
+
+  const isTarget = cmd === 'grep "failed password" auth.log | wc -l' ||
+    (cmd.indexOf('grep') > -1 && cmd.indexOf('failed password') > -1 &&
+     cmd.indexOf('auth.log') > -1 && cmd.indexOf('wc -l') > -1);
+
+  const line = document.createElement('div');
+  if (isTarget) {
+    line.className = 'ht-l ht-out';
+    line.innerHTML = '<span class="ht-warn">841</span>  <span class="ht-dim"># 841 failed logins from one IP in 6 min &mdash; brute force</span>';
+    out.appendChild(line);
+    const note = document.createElement('div');
+    note.className = 'ht-l ht-dim';
+    note.textContent = "# that's the brute-force attempt. Sign up to run the full investigation.";
+    out.appendChild(note);
+  } else {
+    line.className = 'ht-l ht-dim';
+    line.textContent = 'hint: try the command shown above ↑';
+    out.appendChild(line);
+  }
+  input.value = '';
+  if (body) body.scrollTop = body.scrollHeight;
+}
 </script>
 </body>
 </html>
