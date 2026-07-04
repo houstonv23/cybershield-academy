@@ -1457,6 +1457,10 @@
     .siem-output-body { margin: 0; padding: 9px 11px; background: #0a0d13; color: var(--green); font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; line-height: 1.7; overflow-x: auto; white-space: pre; }
     .siem-note { margin-top: 9px; padding: 10px 13px; border: 1px solid var(--cyan); border-radius: 6px; background: rgba(56,189,248,.06); font-size: 12px; line-height: 1.7; color: var(--text); }
     .siem-note code { color: var(--cyan); background: rgba(56,189,248,.08); padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; }
+    /* Synthesis question — correlate two alerts into one attack chain */
+    .siem-synth { margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border); border-left: 3px solid var(--cyan); border-radius: 8px; background: rgba(56,189,248,.04); }
+    .siem-synth-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin-bottom: 10px; }
+    .siem-synth-q { display: block; font-size: 13px; color: var(--text); font-weight: 600; margin-bottom: 10px; line-height: 1.5; }
     /* Capstone — the graded, no-hints assessment that completes the lab */
     .lab4-capstone { margin-top: 22px; padding: 18px; border: 1px solid var(--warning); border-radius: 8px; background: rgba(251,191,36,.05); }
     .capstone-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -5770,6 +5774,37 @@ function submitSiemCheck(i) {
   renderCheckResult(fb, checkAnswer(raw, spec));
 }
 
+// Synthesis question, shown right after triage and BEFORE the practice ladder:
+// makes the learner CORRELATE two alerts into one attack chain instead of
+// judging each alone. 192.168.1.55 is the source of both the /etc/passwd File
+// Access alert and the Lateral Movement alert. Reuses the checkAnswer core.
+const LAB4_SYNTHESIS = {
+  accept: ['192.168.1.55'],
+  right: 'Correct — 192.168.1.55 appears twice: first reading /etc/passwd (reconnaissance), then moving laterally over SMB to three more servers. Judged one at a time each alert looks moderate; connected, they are a single intrusion in progress. Correlating across alerts is what turns triage into incident response.',
+  hint: 'Not quite — do not judge the alerts one at a time. Look for a single SOURCE IP that shows up in TWO of them: an internal host that first touches a sensitive file, then reaches out to several other servers. Which one IP is behind both?',
+};
+
+function renderLab4SynthesisHtml() {
+  return `
+    <div class="siem-synth">
+      <div class="siem-synth-title">First — connect the alerts</div>
+      <label class="siem-synth-q" for="lab4SynthInput">Two of these alerts are the same attacker forming one attack chain — what is that host's IP?</label>
+      <div class="siem-check-row">
+        <input id="lab4SynthInput" class="siem-check-input" type="text" placeholder="enter the host IP" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab4Synthesis();}">
+        <button class="btn btn-cyan siem-check-btn" onclick="submitLab4Synthesis()">Check answer</button>
+      </div>
+      <div id="lab4SynthFb"></div>
+    </div>
+  `;
+}
+
+function submitLab4Synthesis() {
+  const input = document.getElementById('lab4SynthInput');
+  const fb = document.getElementById('lab4SynthFb');
+  if (!input || !fb || !input.value.trim()) return;
+  renderCheckResult(fb, checkAnswer(input.value, LAB4_SYNTHESIS));
+}
+
 // CAPSTONE — a fresh incident on a different server with NO hints. The learner
 // must apply the whole workflow cold (spot the brute force, separate the one
 // successful login from the failures, name the compromised account). Passing
@@ -5888,7 +5923,7 @@ function renderLab4Table() {
       </div>
     </div>
     <div id="lab4Feedback" style="margin-top:16px;"></div>
-    ${triaged === 8 ? renderSiemChecksHtml() + renderLab4CapstoneHtml() : ''}
+    ${triaged === 8 ? renderLab4SynthesisHtml() + renderSiemChecksHtml() + renderLab4CapstoneHtml() : ''}
   `;
 }
 
