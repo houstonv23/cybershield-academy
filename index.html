@@ -5828,7 +5828,7 @@ const LAB4_CAPSTONE = {
   questions: [
     { id: 'ip',   prompt: "(a) What is the attacker's source IP?",       placeholder: 'source IP',    accept: ['198.51.100.66'] },
     { id: 'won',  prompt: '(b) Did the brute force succeed? (yes / no)', placeholder: 'yes or no',    accept: function (n) { return n === 'yes' || n === 'y'; } },
-    { id: 'acct', prompt: '(c) Which account was compromised?',          placeholder: 'account name', accept: function (n) { return n.indexOf('deploy') > -1; } },
+    { id: 'acct', prompt: '(c) Which account was compromised?',          placeholder: 'account name', accept: function (n) { return n === 'deploy'; } }, // clean account name only (n is already normalized: trim/lowercase/collapse-ws)
   ],
   wrongMsg: 'Not correct — re-examine the log and try again. No hints on the capstone; this is where you prove it.',
   successMsg: 'Correct on all three — the brute force from 198.51.100.66 broke through and compromised the deploy account. You correlated the failures, spotted the single success, and named the account: a full investigation of a fresh incident with no help. That is the whole workflow, and it is what earns this lab.',
