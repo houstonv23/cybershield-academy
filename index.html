@@ -1432,6 +1432,15 @@
     .siem-goals-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
     .siem-goals-list li { position: relative; padding-left: 20px; font-size: 12.5px; color: var(--text); line-height: 1.45; }
     .siem-goals-list li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+    /* Optional timed-exam-mode toggle (Lab 4 defaults to untimed) */
+    .lab4-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding: 9px 13px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.02); }
+    .lab4-mode-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+    .lab4-mode-switch input { cursor: pointer; }
+    .lab4-mode-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
+    .lab4-mode-note { font-size: 11.5px; color: var(--muted); }
+    /* "What this miss costs" consequence shown on a WRONG triage call */
+    .lab4-consequence { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,71,87,.28); font-size: 12px; line-height: 1.6; }
+    .lab4-consequence-k { color: var(--danger); font-weight: 700; }
     /* Investigation check-answer step (SIEM lab) */
     .siem-checks { margin-top: 20px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.02); }
     .siem-checks-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan); font-weight: 700; margin-bottom: 14px; }
@@ -5060,9 +5069,13 @@ function openLab(id) {
   const renderers = { 1: renderLab1, 2: renderLab2, 3: renderLab3, 4: renderLab4, 5: renderLab5, 6: renderLab6, 7: renderLab7, 8: renderLab8, 9: renderLab9, 10: renderLab10, 11: renderLab11, 12: renderLab12, 13: renderLab13 };
   if (renderers[id]) renderers[id]();
 
-  // Start per-lab timer (only if lab not already completed)
+  // Start per-lab timer (only if lab not already completed). Lab 4 is a learning
+  // lab — untimed by default; only start its countdown when exam mode is on.
+  _openLabId = id;
+  stopTimer(); // clear any prior lab's timer before deciding
   if (!gs.completedLabs.includes(id)) {
-    startTimer(id);
+    if (id === 4) { if (labTimedMode) startTimer(id); }
+    else { startTimer(id); }
   }
 }
 
@@ -5616,6 +5629,20 @@ const SIEM_LOGS = [
   },
 ];
 
+// Real-world CONSEQUENCE of getting each triage call wrong (dismissing a TP or
+// investigating an FP) — shown on a wrong answer so the miss has teeth, not just
+// an explanation. Keyed by SIEM_LOGS index.
+const LAB4_CONSEQUENCES = {
+  0: 'Dismiss this and the brute force keeps hammering unthrottled — at ~47 tries a minute it eventually guesses a real password, and the attacker walks in through a valid login that no longer trips any "failed login" alert.',
+  1: 'Investigate this and you burn analyst time on ordinary Microsoft 365 traffic. Do that with every benign alert and the queue backs up — that alert fatigue is exactly how the one real threat scrolls past unread.',
+  2: 'Wave this off and you miss the opening move: the attacker is harvesting usernames to target. You also lose the thread — the 02:19 lateral-movement alert is this same host (192.168.1.55), and now nobody connects them.',
+  3: 'Ignore this and the data is already gone — 2.1 GB exfiltrated to an unknown host abroad. By the time it surfaces you are not preventing a breach, you are reporting one, with the regulatory notification clock already running.',
+  4: 'Escalate this scheduled maintenance and you have paged on-call and halted ops over a change that was on the calendar. Cry wolf a few times and people stop trusting your alerts — including the real one.',
+  5: 'Let the scan slide and the attacker quietly finishes mapping every exposed port, then returns to hit the weakest service they found. You just threw away your earliest warning that an attack is coming.',
+  6: 'Chase every normal login and you will spend the shift interrogating employees doing their jobs — while the actual intrusion hides in the noise you are too busy to reach.',
+  7: 'Dismiss this and the intruder keeps spreading over SMB: within minutes they reach a domain controller or file server, deploy ransomware across all three hosts, and one contained alert becomes a full-blown, company-wide outage.',
+};
+
 let lab4State = { triaged: {}, score: 0, done: false };
 
 // In-memory auth.log for the SIEM practice tasks. The learner's grep commands
@@ -5922,6 +5949,13 @@ function renderLab4Table() {
   }).join('');
 
   content.innerHTML = `
+    <div class="lab4-mode">
+      <label class="lab4-mode-switch">
+        <input type="checkbox" id="lab4TimedToggle" ${labTimedMode ? 'checked' : ''} onchange="toggleTimedMode(this.checked)">
+        <span class="lab4-mode-label">Timed exam mode</span>
+      </label>
+      <span class="lab4-mode-note" id="lab4ModeNote">${labTimedMode ? 'Countdown on — the lab auto-submits when time runs out.' : 'Off — learn at your own pace, no countdown.'}</span>
+    </div>
     <div class="siem-goals">
       <div class="siem-goals-title">What you'll be able to do</div>
       <ul class="siem-goals-list">
@@ -5969,7 +6003,7 @@ function answerLab4(idx, choice) {
   renderLab4Table();
   const fb = document.getElementById('lab4Feedback');
   if (fb) fb.innerHTML = `
-    <div class="feedback-card ${correct ? 'correct' : 'wrong'}">[${log.type} from ${log.src}] — ${log.explanation}</div>
+    <div class="feedback-card ${correct ? 'correct' : 'wrong'}">[${log.type} from ${log.src}] — ${log.explanation}${(!correct && LAB4_CONSEQUENCES[idx]) ? `<div class="lab4-consequence"><span class="lab4-consequence-k">What this miss costs:</span> ${LAB4_CONSEQUENCES[idx]}</div>` : ''}</div>
   `;
   // Scroll feedback into view
   setTimeout(() => {
@@ -6979,6 +7013,11 @@ let timerInterval = null;
 let timerSecondsLeft = 0;
 let timerLabId = null;
 let timerExpired = false;
+// Lab 4 is a learning lab — untimed by DEFAULT. Learners opt into the countdown
+// via the "Timed exam mode" toggle; the preference is persisted.
+let labTimedMode = false;
+try { labTimedMode = (localStorage.getItem('csa_timed_mode') === '1'); } catch (e) {}
+let _openLabId = null;
 
 function startTimer(labId) {
   stopTimer();
@@ -7004,6 +7043,22 @@ function stopTimer() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   const el = document.getElementById('labTimer');
   if (el) el.textContent = '';
+}
+
+// Timed exam mode is OPT-IN. Off = untimed learning (default). Toggling it inside
+// a lab starts/stops that lab's countdown immediately and remembers the choice.
+function toggleTimedMode(on) {
+  labTimedMode = !!on;
+  try { localStorage.setItem('csa_timed_mode', labTimedMode ? '1' : '0'); } catch (e) {}
+  if (labTimedMode) {
+    if (_openLabId && !gs.completedLabs.includes(_openLabId)) startTimer(_openLabId);
+  } else {
+    stopTimer();
+  }
+  const note = document.getElementById('lab4ModeNote');
+  if (note) note.textContent = labTimedMode
+    ? 'Countdown on — the lab auto-submits when time runs out.'
+    : 'Off — learn at your own pace, no countdown.';
 }
 
 function renderTimer() {
