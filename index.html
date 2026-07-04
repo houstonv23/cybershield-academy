@@ -1470,6 +1470,8 @@
     .capstone-scenario-title { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
     .capstone-log { margin: 0 0 14px; padding: 11px 13px; background: #0a0d13; border: 1px solid var(--border); border-radius: 4px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11px; line-height: 1.7; color: var(--muted); overflow-x: auto; white-space: pre; }
     .capstone-q { display: block; font-size: 12.5px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+    .capstone-q-block { margin-bottom: 13px; }
+    .lab4-capstone .siem-check-input { width: 100%; display: block; margin-top: 3px; }
     /* Reusable check-answer result (portable to other labs) */
     .check-result { margin-top: 9px; padding: 11px 13px; border-radius: 6px; font-size: 12.5px; line-height: 1.6; color: var(--text); }
     .check-result.ok { border: 1px solid var(--green); background: rgba(52,227,160,.08); }
@@ -5805,14 +5807,13 @@ function submitLab4Synthesis() {
   renderCheckResult(fb, checkAnswer(input.value, LAB4_SYNTHESIS));
 }
 
-// CAPSTONE — a fresh incident on a different server with NO hints. The learner
-// must apply the whole workflow cold (spot the brute force, separate the one
-// successful login from the failures, name the compromised account). Passing
-// THIS is what completes the lab and earns its XP. On a wrong answer it gives
-// no teaching hint — this is the assessment, not practice.
+// CAPSTONE — a fresh incident on a different server, asked as THREE linked
+// questions that force a real synthesis of all three lab objectives on one
+// case: (a) identify the source IP, (b) decide whether the brute force
+// succeeded, (c) name the compromised account. Harder than any single practice
+// task. NO hints on a wrong answer. Only getting ALL THREE right runs
+// finishLab4() and awards the +30 XP.
 const LAB4_CAPSTONE = {
-  // Fresh scenario: a raw auth.log burst — many failures from one IP, then one
-  // success. The compromised account is the one on the "Accepted password" line.
   scenarioTitle: 'web-app-02 · auth.log (new alert — brute force suspected)',
   scenarioLog:
     'Oct 02 03:11:07 web-app-02 sshd[4471]: Failed password for admin from 198.51.100.66 port 42310 ssh2\n' +
@@ -5823,43 +5824,68 @@ const LAB4_CAPSTONE = {
     'Oct 02 03:11:15 web-app-02 sshd[4475]: Failed password for deploy from 198.51.100.66 port 42332 ssh2\n' +
     'Oct 02 03:11:18 web-app-02 sshd[4477]: Accepted password for deploy from 198.51.100.66 port 42340 ssh2\n' +
     'Oct 02 03:11:20 web-app-02 sshd[4477]: session opened for user deploy',
-  question: 'Which user account did the attacker successfully break into?',
-  placeholder: 'account name',
-  accept: function (n) { return n.indexOf('deploy') > -1; },
-  right: 'Correct — the flood of failed logins from 198.51.100.66 is the brute force, and the single "Accepted password" line shows it finally succeeded on the deploy account. You worked a fresh incident end to end with no help — that is the real skill this lab teaches.',
-  hint: 'Not correct — re-read the excerpt and investigate again. No hints on the capstone: this is where you prove you can do it unaided.',
+  intro: 'A new alert just fired on a different server. Investigate it cold and answer all three — no command shown, no hints. The lab completes only when all three are correct.',
+  questions: [
+    { id: 'ip',   prompt: "(a) What is the attacker's source IP?",       placeholder: 'source IP',    accept: ['198.51.100.66'] },
+    { id: 'won',  prompt: '(b) Did the brute force succeed? (yes / no)', placeholder: 'yes or no',    accept: function (n) { return n === 'yes' || n === 'y'; } },
+    { id: 'acct', prompt: '(c) Which account was compromised?',          placeholder: 'account name', accept: function (n) { return n.indexOf('deploy') > -1; } },
+  ],
+  wrongMsg: 'Not correct — re-examine the log and try again. No hints on the capstone; this is where you prove it.',
+  successMsg: 'Correct on all three — the brute force from 198.51.100.66 broke through and compromised the deploy account. You correlated the failures, spotted the single success, and named the account: a full investigation of a fresh incident with no help. That is the whole workflow, and it is what earns this lab.',
 };
 
 function renderLab4CapstoneHtml() {
+  const C = LAB4_CAPSTONE;
   return `
     <div class="lab4-capstone">
       <div class="capstone-head">
         <span class="capstone-badge">Capstone</span>
-        <span class="capstone-note">Completing this earns your XP and lab completion — no hints.</span>
+        <span class="capstone-note">Answer all three to earn your XP and complete the lab — no hints.</span>
       </div>
-      <div class="capstone-prompt">A new alert just fired on a different server — investigate it cold and apply the full workflow.</div>
-      <div class="capstone-scenario-title">${LAB4_CAPSTONE.scenarioTitle}</div>
-      <pre class="capstone-log">${LAB4_CAPSTONE.scenarioLog}</pre>
-      <label class="capstone-q" for="lab4CapstoneInput">${LAB4_CAPSTONE.question}</label>
-      <div class="siem-check-row">
-        <input id="lab4CapstoneInput" class="siem-check-input" type="text" placeholder="${LAB4_CAPSTONE.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab4Capstone();}">
-        <button class="btn btn-green capstone-btn" onclick="submitLab4Capstone()">Submit &amp; complete lab</button>
-      </div>
-      <div id="lab4CapstoneFb"></div>
+      <div class="capstone-prompt">${C.intro}</div>
+      <div class="capstone-scenario-title">${C.scenarioTitle}</div>
+      <pre class="capstone-log">${C.scenarioLog}</pre>
+      ${C.questions.map(function (q) { return `
+        <div class="capstone-q-block">
+          <label class="capstone-q" for="lab4Cap_${q.id}">${q.prompt}</label>
+          <input id="lab4Cap_${q.id}" class="siem-check-input" type="text" placeholder="${q.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab4Capstone();}">
+          <div id="lab4CapFb_${q.id}"></div>
+        </div>`; }).join('')}
+      <button class="btn btn-green capstone-btn" onclick="submitLab4Capstone()">Submit &amp; complete lab</button>
+      <div id="lab4CapstoneSummary" style="margin-top:10px;"></div>
     </div>
   `;
 }
 
 function submitLab4Capstone() {
-  const input = document.getElementById('lab4CapstoneInput');
-  const fb = document.getElementById('lab4CapstoneFb');
-  if (!input || !input.value.trim()) return;
-  const result = checkAnswer(input.value, LAB4_CAPSTONE);
-  renderCheckResult(fb, result);
-  if (result.correct) {
-    // Passing the capstone is what completes the lab and earns the XP.
-    awardPoints(30);
-    setTimeout(function () { finishLab4(); }, 800);
+  const C = LAB4_CAPSTONE;
+  let allCorrect = true;
+  let answeredAll = true;
+  C.questions.forEach(function (q) {
+    const input = document.getElementById('lab4Cap_' + q.id);
+    const fb = document.getElementById('lab4CapFb_' + q.id);
+    if (!input || !fb) return;
+    if (!input.value.trim()) {
+      allCorrect = false; answeredAll = false;
+      renderCheckResult(fb, { correct: false, message: 'Answer all three before submitting.' });
+      return;
+    }
+    // Each question reuses the checkAnswer core; wrong answers get no hint.
+    const res = checkAnswer(input.value, { accept: q.accept, right: 'Correct.', hint: C.wrongMsg });
+    renderCheckResult(fb, res);
+    if (!res.correct) allCorrect = false;
+  });
+
+  const summary = document.getElementById('lab4CapstoneSummary');
+  if (allCorrect) {
+    if (summary) summary.innerHTML = checkResultHtml(true, C.successMsg);
+    // All three right → THIS completes the lab and awards the +30 XP (once).
+    if (!lab4State.capstoneDone) { lab4State.capstoneDone = true; awardPoints(30); }
+    setTimeout(function () { finishLab4(); }, 900);
+  } else if (summary) {
+    summary.innerHTML = checkResultHtml(false, answeredAll
+      ? 'Not all three are right yet — fix the ones marked ✗ and resubmit. The lab completes only when all three are correct.'
+      : 'Answer all three questions, then submit. The lab completes only when all three are correct.');
   }
 }
 
