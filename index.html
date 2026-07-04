@@ -720,6 +720,21 @@
     }
     .hero-trust-item { display: flex; align-items: center; gap: 5px; }
     .hero-trust-check { color: #16a34a; font-weight: 700; }
+    /* Slim hero proof strip — intentionally subtle (small, muted, thin separators) */
+    .hero-proof {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: #71717a;
+      max-width: 520px;
+      margin-bottom: 18px;
+    }
+    .hero-proof-stat strong { color: #3f3f46; font-weight: 700; }
+    .hero-proof-dot { color: #d4d4d8; }
+    .hero-proof-quote { font-style: italic; color: #71717a; }
+    .hero-proof-cite { font-style: normal; color: #a1a1aa; }
 
     /* ---- Dashboard mockup ---- */
     /* Hero terminal — shows the actual hands-on lab experience */
@@ -2193,10 +2208,26 @@
           Cybersecurity Training Platform
         </div>
         <h1 class="hero-h1">Learn cybersecurity by<br><em>doing</em> it &mdash; not<br>watching it.</h1>
-        <p class="hero-sub">Hands-on simulation labs built for schools, security teams, and compliance programs. No software to install. Results from day one.</p>
+        <p class="hero-sub">Hands-on simulation labs for curious beginners, career changers, schools, and security teams. No software to install. Results from day one.</p>
         <div class="hero-btns">
           <button class="hero-btn-primary" onclick="handleGetStarted()">Get Started Free</button>
           <button class="hero-btn-ghost" onclick="document.getElementById('see-it').scrollIntoView({behavior:'smooth'})">See It in Action &rarr;</button>
+        </div>
+        <!-- ============================================================
+             HERO PROOF STRIP — PLACEHOLDER TRUST SIGNALS
+             All bracketed [TOKENS] below are PLACEHOLDERS. Replace each
+             with a real value before shipping — do not launch with the
+             brackets visible. (Search this file for "[STAT_" and "[NAME]".)
+             ============================================================ -->
+        <div class="hero-proof">
+          <!-- PLACEHOLDER [STAT_1]: total labs completed across all users, e.g. 12,400 -->
+          <span class="hero-proof-stat"><strong>[STAT_1]</strong> labs completed</span>
+          <span class="hero-proof-dot">&middot;</span>
+          <!-- PLACEHOLDER [STAT_2]: total number of learners, e.g. 1,300 -->
+          <span class="hero-proof-stat"><strong>[STAT_2]</strong> learners</span>
+          <span class="hero-proof-dot">&middot;</span>
+          <!-- PLACEHOLDER [QUOTE] (short, ~6 words), [NAME], and [ROLE]: one real short testimonial -->
+          <span class="hero-proof-quote">&ldquo;[QUOTE]&rdquo; &mdash; <span class="hero-proof-cite">[NAME], [ROLE]</span></span>
         </div>
         <div class="hero-trust">
           <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> No credit card required</span>
