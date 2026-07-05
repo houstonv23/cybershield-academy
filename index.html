@@ -1479,6 +1479,17 @@
     .check-result-icon { font-weight: 700; }
     .check-result.ok .check-result-icon { color: var(--green); }
     .check-result.no .check-result-icon { color: var(--warning); }
+    /* "Apply it" interactive step (track modules) — theme-aware */
+    .apply-brief { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--warning); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: .9rem; line-height: 1.6; color: var(--text); }
+    .apply-brief-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--warning); font-weight: 700; margin-bottom: 8px; }
+    .apply-evidence { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-top: 12px; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 12px; line-height: 1.7; color: var(--muted); white-space: pre-wrap; overflow-x: auto; }
+    .apply-q { margin-bottom: 18px; }
+    .apply-q-label { display: block; font-size: .9rem; color: var(--text); margin-bottom: 8px; line-height: 1.5; font-weight: 600; }
+    .apply-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .apply-input { flex: 1 1 220px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; color: var(--text); font-family: inherit; font-size: .9rem; }
+    .apply-input:focus { outline: none; border-color: var(--cyan); }
+    .apply-btn { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 9px 18px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .apply-btn:hover { background: #1d4ed8; }
 
     /* ===== LAB 5 — WIRESHARK ===== */
     .ws-table-wrap { overflow-x: auto; margin-bottom: 0; border: 1px solid var(--border); border-radius: 4px 4px 0 0; }
@@ -13465,6 +13476,91 @@ function riskNext(modId) {
 // Break a module into discrete "pages" (primer, each reading topic, videos,
 // hands-on lab, knowledge check) navigated with Back/Next arrows + step dots —
 // instead of one long scroll. The left sidebar still handles module navigation.
+// "Apply it" interactive step — a realistic scenario the learner works BETWEEN
+// the reading and the quiz. Typed/decide answers validated by the shared
+// checkAnswer/renderCheckResult pattern, with teaching hints on wrong answers.
+// Keyed by module id; APPLY_MODULES is derived so buildModulePages can inject it.
+const APPLY_SCENARIOS = {
+  'hoteltech-6': {
+    brief: `<b>23:40, Saturday — a sold-out weekend at the Grand Cypress Hotel (250 rooms).</b> Your SIEM flags the property-management server <b>PMS-01</b>: a large outbound transfer of the reservations database, plus a point-of-sale malware signature on two front-desk terminals. Cardholder data and guest PII (names, emails, passport numbers — including EU residents) are in scope.`,
+    evidence: `23:40  PMS-01        1.8 GB outbound  ->  203.0.113.88  (unknown, offshore)
+23:41  FD-POS-01     RAM-scraper malware signature (card data in memory)
+23:41  FD-POS-02     RAM-scraper malware signature
+Scope  cardholder data + guest PII (EU + US guests)
+Status occupancy 100% — reservations system being isolated`,
+    intro: `Work the incident. Type each response and check it — you'll get feedback that explains the call before the knowledge check that follows.`,
+    checks: [
+      {
+        prompt: 'The reservations system is being isolated on a sold-out night. Name the degraded-operation procedure from your IR plan that keeps the front desk checking guests in.',
+        placeholder: 'e.g. two words',
+        accept: function (n) { return n.indexOf('manual') > -1 && n.indexOf('check') > -1; },
+        right: 'Correct — manual check-in. The reading says IR plans must include degraded-operation procedures (manual check-in, paper key cards, offline payment) so the hotel keeps running while systems are isolated.',
+        hint: 'Not quite — the "Hotel-Specific IR Scenarios" phase lists three degraded-operation procedures: manual check-in, paper key cards, and offline payment. Which one gets guests into rooms while the PMS is down?',
+      },
+      {
+        prompt: 'You have confirmed cardholder data is exposed. Under PCI-DSS, within how many HOURS must you notify the card brands (Visa, Mastercard)?',
+        placeholder: 'hours',
+        accept: function (n) { return n.replace(/\D/g, '') === '24'; },
+        right: 'Correct — 24 hours. PCI-DSS requires notifying the card brands within 24 hours of a confirmed cardholder-data breach — the tightest of the several clocks a hotel breach starts.',
+        hint: 'Not quite — re-read "Regulatory Notification for Hotels." PCI-DSS is the tightest clock: notify the card brands within a single day of confirmation.',
+      },
+      {
+        prompt: 'Some of the exposed guests are EU residents. Under GDPR, within how many HOURS must you notify the data protection authority?',
+        placeholder: 'hours',
+        accept: function (n) { return n.replace(/\D/g, '') === '72'; },
+        right: 'Correct — 72 hours. GDPR requires notifying the supervisory authority within 72 hours of becoming aware of a personal-data breach.',
+        hint: 'Not quite — GDPR gives you three days (in hours) from awareness to notify the data protection authority. Check the notification clocks in the reading.',
+      },
+      {
+        prompt: 'Payment data was exposed. What specific service should you offer the affected guests?',
+        placeholder: 'a service',
+        accept: function (n) { return n.indexOf('credit') > -1 && n.indexOf('monitor') > -1; },
+        right: 'Correct — credit monitoring. The "Guest Communication During a Breach" phase says to offer credit monitoring services for serious breaches involving financial data.',
+        hint: 'Not quite — for a breach involving guests\' financial data, the reading names one specific service to offer that helps them watch their accounts for fraud.',
+      },
+      {
+        prompt: 'You must email affected guests. Do you send it from a newly-registered incident domain, or your established brand email? (type: new / established)',
+        placeholder: 'new or established',
+        accept: function (n) { return n.indexOf('establish') > -1 || n.indexOf('brand') > -1; },
+        right: 'Correct — your established brand email. The reading warns never to send breach notifications from a new or unknown domain, because guests will assume it is phishing.',
+        hint: 'Not quite — think about how a guest reacts to an email from an unfamiliar domain right after a breach. The reading is explicit about which domain to use.',
+      },
+    ],
+  },
+};
+const APPLY_MODULES = new Set(Object.keys(APPLY_SCENARIOS));
+
+function buildApplyStep(modId) {
+  const s = APPLY_SCENARIOS[modId];
+  if (!s) return '';
+  return `
+    <div class="apply-brief">
+      <div class="apply-brief-title">Incident brief</div>
+      <div>${s.brief}</div>
+      <div class="apply-evidence">${s.evidence}</div>
+    </div>
+    <p style="font-size:.9rem;color:var(--muted);margin:0 0 16px;line-height:1.6;">${s.intro}</p>
+    ${s.checks.map(function (c, i) { return `
+      <div class="apply-q">
+        <label class="apply-q-label" for="apply-${modId}-${i}">${c.prompt}</label>
+        <div class="apply-row">
+          <input id="apply-${modId}-${i}" class="apply-input" type="text" placeholder="${c.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitApplyCheck('${modId}',${i});}">
+          <button class="apply-btn" onclick="submitApplyCheck('${modId}',${i})">Check</button>
+        </div>
+        <div id="applyFb-${modId}-${i}"></div>
+      </div>`; }).join('')}
+  `;
+}
+
+function submitApplyCheck(modId, i) {
+  const s = APPLY_SCENARIOS[modId];
+  if (!s) return;
+  const input = document.getElementById('apply-' + modId + '-' + i);
+  const fb = document.getElementById('applyFb-' + modId + '-' + i);
+  if (!input || !fb || !input.value.trim()) return;
+  renderCheckResult(fb, checkAnswer(input.value, s.checks[i]));
+}
+
 function buildModulePages(mod) {
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const nPhases = (mod.phases || []).length;
@@ -13521,6 +13617,15 @@ function buildModulePages(mod) {
 
   const lab = buildAttackMap(mod.id) + buildTerminalLab(mod.id);
   if (lab.trim()) pages.push({ label: 'Hands-on lab', html: lab });
+
+  if (typeof APPLY_MODULES !== 'undefined' && APPLY_MODULES.has(mod.id)) {
+    pages.push({ label: 'Apply it', html: `
+      <div class="tc-page-intro">
+        <div class="track-phase-label">Apply it — work the incident</div>
+        <p style="margin:6px 0 0;color:var(--muted);font-size:.9rem;line-height:1.6;">You've read the playbook. Now a real incident is unfolding at your property. Examine the evidence and make the calls — type each response and get coaching before the knowledge check.</p>
+      </div>
+      ${buildApplyStep(mod.id)}` });
+  }
 
   pages.push({ label: 'Knowledge Check', html: `<div class="track-quiz" id="quiz-${mod.id}">${buildMiniQuiz(mod.id, mod.quiz, mod.phases)}</div>` });
 
