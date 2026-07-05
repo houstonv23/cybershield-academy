@@ -7002,11 +7002,13 @@ function finishLab7() {
   stopTimer();
   completeLabFinish(7, lab7State.score, 5);
   document.getElementById('prog-7').style.width = '100%';
+  const passed = labPassed(lab7State.score, 5);
   document.getElementById('labContent').innerHTML = `
     <div class="lab-complete">
       <div class="lc-icon"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M5 9a3 3 0 0 1-3-3V5h3M19 9a3 3 0 0 0 3-3V5h-3"/></svg></div>
-      <h3>LAB COMPLETE</h3>
+      <h3>${passed ? 'LAB COMPLETE' : 'LAB COMPLETE — REVIEW NEEDED'}</h3>
       <div class="score-big">${lab7State.score} / 5</div>
+      ${passed ? '' : `<div style="color:var(--warning);font-size:12px;margin-bottom:6px;">You need 4 / 5 to pass — review the calls you missed and retry.</div>`}
       <p>You just worked through a real incident: brute-force → account compromise → reverse shell → lateral movement → eradication → hardening.<br/><br/>
       Key takeaways: Follow the NIST IR lifecycle — Preparation, Detection, Containment, Eradication, Recovery, Lessons Learned.<br/>
       Speed matters in containment. Never trust a compromised machine — always wipe and reimage.<br/>
@@ -7020,7 +7022,7 @@ function finishLab7() {
         <div>🔒 <strong style="color:var(--text)">Recovery</strong> — Defense-in-depth hardening, lessons learned</div>
       </div>
       <div class="action-btns" style="justify-content:center;margin-top:24px;">
-        <button class="btn btn-cyan" onclick="openLab(8)">UNLOCK THREAT INTEL</button>
+        ${passed ? `<button class="btn btn-cyan" onclick="openLab(8)">UNLOCK THREAT INTEL</button>` : ''}
         <button class="btn btn-green" onclick="renderLab7()">RETRY</button>
         <button class="btn btn-warning" onclick="exportStudyNotes(7)">EXPORT STUDY NOTES</button>
       </div>
