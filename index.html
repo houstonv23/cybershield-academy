@@ -1583,6 +1583,29 @@
     .am-ioc-fb:not(:empty) { margin-bottom: 8px; }
     .am-ioc-reveal { animation: amRevealIn .25s ease; }
     .am-ioc-reveal-label { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--cyan); margin-bottom: 2px; }
+    /* Module 8 capstone — theme-aware */
+    .am-capstone { margin-top: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 16px 18px; }
+    .am-cap-hdr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+    .am-cap-badge { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; color: #fff; background: var(--danger); border-radius: 5px; padding: 3px 8px; }
+    .am-cap-intro { font-size: 12.5px; line-height: 1.65; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--danger); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+    .am-cap-q { margin-bottom: 16px; }
+    .am-cap-q:last-of-type { margin-bottom: 6px; }
+    .am-cap-qlabel { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+    .am-cap-qnum { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 5px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; }
+    .am-cap-qtext { font-size: 13px; font-weight: 600; line-height: 1.5; color: var(--text); margin-bottom: 10px; }
+    .am-cap-opts { display: flex; flex-direction: column; gap: 8px; }
+    .am-cap-opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-family: inherit; font-size: 12.5px; line-height: 1.45; cursor: pointer; transition: border-color .15s, background .15s; }
+    .am-cap-opt:hover:not(:disabled) { border-color: var(--cyan); }
+    .am-cap-opt:disabled { cursor: default; }
+    .am-cap-opt.correct { border-color: var(--green); background: rgba(53,208,127,.10); }
+    .am-cap-opt.correct .am-predict-optltr { border-color: var(--green); color: var(--green); }
+    .am-cap-opt.wrong { border-color: var(--danger); background: rgba(239,68,68,.08); }
+    .am-cap-opt.wrong .am-predict-optltr { border-color: var(--danger); color: var(--danger); }
+    .am-cap-opt.dim { opacity: .5; }
+    .am-cap-fb { margin-top: 8px; }
+    .am-cap-done { margin-top: 4px; text-align: center; padding: 16px; background: rgba(53,208,127,.10); border: 1px solid var(--green); border-radius: 10px; animation: amRevealIn .25s ease; }
+    .am-cap-done-title { font-weight: 800; color: var(--green); font-size: 15px; margin-bottom: 3px; }
+    .am-cap-done-sub { font-size: 12px; color: var(--text); line-height: 1.55; opacity: .85; }
 
     /* ===== INTERACTIVE TERMINAL LAB ===== */
     .termlab { margin: 18px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0a0e14; }
@@ -13058,6 +13081,38 @@ const IOC_TASKS = [
   },
 ];
 
+// Capstone content for the Module 8 IoT kill chain (hoteltech-8). Q0 is the
+// synthesis question the whole walkthrough builds toward (answer: network
+// segmentation); Q1 is a fresh applied IoT/BMS scenario. No hints — a wrong
+// pick just prompts a retry; a correct pick reveals the teaching explanation.
+const IOT_CAPSTONE = {
+  intro: `You just walked the full intrusion end to end: an attacker found an internet-exposed lobby camera still on its factory-default password (stage 1), ran commands to get a foothold (2), scanned the flat network and discovered the PMS (3), pivoted over open remote services into the booking servers (4), collected guest and cardholder data (5), and exfiltrated it over a C2 channel (6). Six stages, one breach — now the synthesis the walkthrough has been building toward.`,
+  questions: [
+    {
+      q: 'Looking back across all six stages, which SINGLE control would have contained this entire incident — stopping the attacker even if the lobby camera stayed compromised?',
+      options: [
+        'Changing the camera\'s factory-default password',
+        'Network segmentation — isolating IoT/BMS devices on their own VLAN with no route to the PMS/booking network',
+        'Installing endpoint antivirus on the front-desk workstations',
+        'Enforcing MFA on the property-management system login',
+      ],
+      correct: 1,
+      right: 'Correct — network segmentation is the one control that breaks the chain no matter what. Even with the camera fully owned, an isolated IoT VLAN with no route to the business network means the attacker\'s scan (stage 3) sees only other thermostats, the pivot (stage 4) has nowhere to go, and guest data is never reached. Each other control stops a single stage; segmentation contains the whole incident.',
+    },
+    {
+      q: 'Fresh situation: during a security review you find the hotel\'s HVAC controller has its web-management console reachable from the public internet, still using the vendor\'s default login. What is the best first action?',
+      options: [
+        'Take the management console off the public internet (reachable only via VPN) and change the default credentials',
+        'Move the HVAC controller onto the guest Wi-Fi network so guests can\'t reach staff systems',
+        'Install the latest firmware and leave the console internet-facing',
+        'Leave it exposed for now but monitor it with endpoint detection',
+      ],
+      correct: 0,
+      right: 'Correct — an internet-exposed management console on default credentials is exactly how stage 1 began. Take the interface off the public internet (reach it only via VPN) and change the vendor defaults immediately. Firmware updates, monitoring, or moving it to guest Wi-Fi all leave the exposed, default-credentialed console reachable.',
+    },
+  ],
+};
+
 function buildAttackMap(modId) {
   const path = ATTACK_PATHS[modId];
   if (!path) return '';
@@ -13077,6 +13132,35 @@ function buildAttackMap(modId) {
       </div>
       <div class="am-rail">${nodes}</div>
       <div class="am-detail" id="amdetail-${modId}">${amDetailHtml(path.nodes[0], 0, modId)}</div>
+    </div>${(modId === 'hoteltech-8' && typeof IOT_CAPSTONE !== 'undefined') ? buildIotCapstone(modId) : ''}`;
+}
+
+// Capstone for the Module 8 IoT kill chain: restates the whole scenario and
+// asks the synthesis question the walkthrough builds toward (one control that
+// would have contained the incident = network segmentation) plus one applied
+// question on a fresh IoT/BMS situation, with no hints. Passing both records
+// module completion the same way the track's other labs do (csa_tracks +150 XP).
+function buildIotCapstone(modId) {
+  const c = IOT_CAPSTONE;
+  const qs = c.questions.map(function (q, qi) {
+    const opts = q.options.map(function (o, oi) {
+      return `<button class="am-cap-opt" onclick="amCapstonePick('${modId}',${qi},${oi})">` +
+        `<span class="am-predict-optltr">${String.fromCharCode(65 + oi)}</span><span>${o}</span></button>`;
+    }).join('');
+    return `
+      <div class="am-cap-q" id="amCapQ-${modId}-${qi}">
+        <div class="am-cap-qlabel"><span class="am-cap-qnum">${qi + 1}</span>${qi === 0 ? 'Synthesis' : 'Apply it — fresh situation'}</div>
+        <div class="am-cap-qtext">${q.q}</div>
+        <div class="am-cap-opts" id="amCapOpts-${modId}-${qi}">${opts}</div>
+        <div class="am-cap-fb" id="amCapFb-${modId}-${qi}"></div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="am-capstone" id="amCapstone-${modId}">
+      <div class="am-cap-hdr"><span class="am-cap-badge">Capstone</span>Which one control would have contained this entire incident?</div>
+      <div class="am-cap-intro">${c.intro}</div>
+      ${qs}
+      <div class="am-cap-done" id="amCapDone-${modId}" style="display:none"></div>
     </div>`;
 }
 
@@ -13229,6 +13313,66 @@ function amIoc(modId, idx, lineIdx) {
     });
   } else if (lines[lineIdx]) {
     lines[lineIdx].classList.add('wrong');
+  }
+}
+
+// Module 8 capstone. Same shared checkAnswer/feedback pattern, but no hints:
+// a wrong pick just prompts a retry, a correct pick reveals the explanation.
+// When BOTH questions are answered correctly the lab is marked complete the
+// same way the track's other labs record completion (csa_tracks + 150 XP once).
+const AM_CAPSTONE_WRONG = 'Not quite — reconsider the whole chain and try again.';
+const amCapstoneSolved = {};
+function amCapstonePick(modId, qi, choiceIdx) {
+  const c = (typeof IOT_CAPSTONE !== 'undefined') && IOT_CAPSTONE;
+  if (!c || !c.questions[qi] || amCapstoneSolved[modId + '-' + qi]) return;
+  const q = c.questions[qi];
+  const result = checkAnswer(q.options[choiceIdx], {
+    accept: [q.options[q.correct]],
+    right: q.right,
+    hint: AM_CAPSTONE_WRONG,
+  });
+  renderCheckResult(document.getElementById('amCapFb-' + modId + '-' + qi), result);
+  const opts = document.querySelectorAll('#amCapOpts-' + modId + '-' + qi + ' .am-cap-opt');
+  if (result.correct) {
+    amCapstoneSolved[modId + '-' + qi] = true;
+    opts.forEach(function (b, i) {
+      b.disabled = true;
+      b.classList.remove('wrong');
+      b.classList.add(i === q.correct ? 'correct' : 'dim');
+    });
+    amCapstoneMaybeComplete(modId);
+  } else if (opts[choiceIdx]) {
+    opts[choiceIdx].classList.add('wrong');
+  }
+}
+
+function amCapstoneMaybeComplete(modId) {
+  const c = IOT_CAPSTONE;
+  const allDone = c.questions.every(function (_, qi) { return amCapstoneSolved[modId + '-' + qi]; });
+  if (!allDone) return;
+  // Record completion exactly like the track's other hands-on labs do.
+  const t = JSON.parse(localStorage.getItem('csa_tracks') || '{}');
+  const wasComplete = t[modId] === 'complete';
+  if (!demoMode) {
+    t[modId] = 'complete';
+    localStorage.setItem('csa_tracks', JSON.stringify(t));
+  }
+  // Show the completion state first, so it never depends on the reward/analytics
+  // side effects below succeeding.
+  const done = document.getElementById('amCapDone-' + modId);
+  if (done) {
+    done.style.display = 'block';
+    done.innerHTML = '<div class="am-cap-done-title">Lab complete</div>' +
+      '<div class="am-cap-done-sub">' + (demoMode
+        ? 'Demo mode — progress isn\'t saved, but you nailed the synthesis: network segmentation is the one control that would have contained this entire incident.'
+        : 'You\'ve completed the IoT kill-chain lab. Network segmentation is the single control that would have contained this entire incident.') + '</div>';
+  }
+  if (!demoMode && !wasComplete) {
+    gs.xp = (gs.xp || 0) + 150;
+    saveState();
+    updateXPBar();
+    showToast('Lab complete! +150 XP');
+    updateAirtableProgress(localStorage.getItem('csa_current_user') || '');
   }
 }
 
