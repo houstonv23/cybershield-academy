@@ -6907,7 +6907,10 @@ function showLab7Hint() {
 }
 
 function renderLab7() {
-  lab7State = { stepIdx: 0, score: 0, answered: false };
+  // Full clean reset for RETRY: step/score, capstone flag, and the progress bar.
+  lab7State = { stepIdx: 0, score: 0, answered: false, capstoneDone: false };
+  const p = document.getElementById('prog-7');
+  if (p) p.style.width = '0%';
   renderLab7Step();
 }
 
@@ -6983,7 +6986,7 @@ function answerLab7(optIdx) {
   document.getElementById('lab7Feedback').innerHTML = `
     <div class="feedback-card ${correct ? 'correct' : 'wrong'}" style="margin-top:14px;">${step.explanation}</div>
     <div class="next-btn">
-      <button class="btn btn-cyan" onclick="nextLab7Step()">${lab7State.stepIdx < 4 ? 'NEXT STEP' : 'FINISH LAB'}</button>
+      <button class="btn btn-cyan" onclick="nextLab7Step()">${lab7State.stepIdx < 4 ? 'NEXT STEP' : 'CONTINUE TO ANALYSIS'}</button>
     </div>
   `;
 }
@@ -6992,7 +6995,7 @@ function nextLab7Step() {
   lab7State.stepIdx++;
   lab7State.answered = false;
   if (lab7State.stepIdx >= IR_STEPS.length) {
-    finishLab7();
+    renderLab7Analysis();
   } else {
     renderLab7Step();
   }
@@ -7000,16 +7003,16 @@ function nextLab7Step() {
 
 function finishLab7() {
   stopTimer();
-  completeLabFinish(7, lab7State.score, 5);
+  // Reached only when the capstone is cleared — record a passing score so the
+  // completion persists (healLabCompletions) and Threat Intel (Lab 8) unlocks.
+  completeLabFinish(7, Math.max(lab7State.score, labPassMark(5)), 5);
   document.getElementById('prog-7').style.width = '100%';
-  const passed = labPassed(lab7State.score, 5);
   document.getElementById('labContent').innerHTML = `
     <div class="lab-complete">
       <div class="lc-icon"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M5 9a3 3 0 0 1-3-3V5h3M19 9a3 3 0 0 0 3-3V5h-3"/></svg></div>
-      <h3>${passed ? 'LAB COMPLETE' : 'LAB COMPLETE — REVIEW NEEDED'}</h3>
+      <h3>LAB COMPLETE — CAPSTONE CLEARED</h3>
       <div class="score-big">${lab7State.score} / 5</div>
-      ${passed ? '' : `<div style="color:var(--warning);font-size:12px;margin-bottom:6px;">You need 4 / 5 to pass — review the calls you missed and retry.</div>`}
-      <p>You just worked through a real incident: brute-force → account compromise → reverse shell → lateral movement → eradication → hardening.<br/><br/>
+      <p>You worked a live incident end to end, pulled the evidence, and cleared a fresh case cold — that is what earns this lab.<br/><br/>
       Key takeaways: Follow the NIST IR lifecycle — Preparation, Detection, Containment, Eradication, Recovery, Lessons Learned.<br/>
       Speed matters in containment. Never trust a compromised machine — always wipe and reimage.<br/>
       MFA + lockout policies stop the majority of credential-based attacks before they start.</p>
@@ -7022,12 +7025,138 @@ function finishLab7() {
         <div>🔒 <strong style="color:var(--text)">Recovery</strong> — Defense-in-depth hardening, lessons learned</div>
       </div>
       <div class="action-btns" style="justify-content:center;margin-top:24px;">
-        ${passed ? `<button class="btn btn-cyan" onclick="openLab(8)">UNLOCK THREAT INTEL</button>` : ''}
+        <button class="btn btn-cyan" onclick="openLab(8)">UNLOCK THREAT INTEL</button>
         <button class="btn btn-green" onclick="renderLab7()">RETRY</button>
         <button class="btn btn-warning" onclick="exportStudyNotes(7)">EXPORT STUDY NOTES</button>
       </div>
     </div>
   `;
+}
+
+/* ============================================================
+   LAB 7 — EVIDENCE ANALYSIS + CAPSTONE (typed input)
+   After the 5 decision steps: a typed evidence-recall section
+   (guided, with hints) then a NO-HINTS capstone on a FRESH
+   incident that GATES completion — mirrors the SIEM lab. Reuses
+   the portable checkAnswer / renderCheckResult core and the
+   shared .siem-check* / .lab4-capstone styles.
+   ============================================================ */
+const IR_EVIDENCE = [
+  {
+    prompt: 'All the malicious traffic came from one address. What is the attacker\'s source IP?',
+    placeholder: 'source IP',
+    accept: ['185.220.101.45'],
+    right: 'Correct — 185.220.101.45 is the single source behind the brute force and the follow-on attempts against admin, bwilliams, and svc-backup. Blocking it was step one of containment.',
+    hint: 'Not quite — one public IP appears in both the 52 failed logins (Detection) and the attempts on the other accounts (Containment). That is your attacker.',
+  },
+  {
+    prompt: 'The outbound reverse-shell / C2 connection used a well-known default port. Which port number?',
+    placeholder: 'port',
+    accept: function (n) { return n.replace(/\D/g, '') === '4444'; },
+    right: 'Correct — port 4444 is the default Meterpreter listener. A sustained outbound connection there means the attacker had an interactive shell.',
+    hint: 'Not quite — re-read the Identification step. The 4-minute outbound connection to 91.195.240.117 used the port that is Meterpreter\'s default.',
+  },
+  {
+    prompt: 'What local admin account did the attacker create as a backdoor for persistence?',
+    placeholder: 'account name',
+    accept: function (n) { return n.replace(/["']/g, '') === 'svchost32'; },
+    right: 'Correct — "svchost32" is the rogue local admin planted to survive a password reset, named to blend in with the real svchost process.',
+    hint: 'Not quite — the Eradication step names a new local admin account the attacker created, disguised to look like a normal Windows process.',
+  },
+];
+
+const IR_CAPSTONE = {
+  scene: `A NEW incident, one week later. Workstation <strong>WS-FIN-09</strong> (finance) alerts: a macro-enabled Excel attachment spawned <strong>PowerShell</strong>, which opened an outbound connection to <strong>45.77.13.201 on port 8080</strong>. Minutes later a new scheduled task named <strong>"MSOfficeUpdater"</strong> appears, re-running a script every 10 minutes.`,
+  intro: 'Fresh incident — investigate it cold and answer all three. No hints. The lab completes only when all three are correct.',
+  questions: [
+    { id: 'ip',   prompt: "(a) What is the C2 server's IP address?", placeholder: 'C2 IP', accept: ['45.77.13.201'] },
+    { id: 'port', prompt: '(b) What port is the C2 traffic using?',   placeholder: 'port',  accept: function (n) { return n.replace(/\D/g, '') === '8080'; } },
+    { id: 'task', prompt: '(c) What is the name of the malicious scheduled task the attacker created for persistence?', placeholder: 'task name', accept: function (n) { return n.replace(/["']/g, '') === 'msofficeupdater'; } },
+  ],
+  wrongMsg: 'Not correct — re-read the incident and try again. No hints on the capstone; this is where you prove it.',
+  successMsg: 'Correct on all three — from a fresh incident with no help you pulled the C2 IP (45.77.13.201), the port (8080), and the persistence mechanism (the "MSOfficeUpdater" scheduled task). That is the whole IR workflow applied cold.',
+};
+
+function renderLab7Analysis() {
+  const content = document.getElementById('labContent');
+  content.innerHTML = `
+    <div style="margin-bottom:18px;">
+      <div style="font-size:16px;color:var(--cyan);margin-bottom:6px;text-shadow:0 0 8px var(--cyan);">Incident worked — now pull the evidence</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">You made the calls. Type the key facts from what you investigated (hints available), then prove the whole workflow on a fresh incident.</div>
+    </div>
+    ${renderLab7EvidenceHtml()}
+    ${renderLab7CapstoneHtml()}
+  `;
+}
+
+function renderLab7EvidenceHtml() {
+  return `
+    <div class="siem-checks">
+      <div class="siem-checks-title">Evidence — pull the facts from the incident</div>
+      <div class="siem-checks-sub">Type the exact value from what you just investigated.</div>
+      ${IR_EVIDENCE.map(function (c, i) { return `
+        <div class="siem-check">
+          <label class="siem-check-q" for="irEv${i}">${c.prompt}</label>
+          <div class="siem-check-row">
+            <input id="irEv${i}" class="siem-check-input" type="text" placeholder="${c.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab7Evidence(${i});}">
+            <button class="btn btn-cyan siem-check-btn" onclick="submitLab7Evidence(${i})">Check answer</button>
+          </div>
+          <div id="irEvFb${i}"></div>
+        </div>`; }).join('')}
+    </div>
+  `;
+}
+
+function submitLab7Evidence(i) {
+  const input = document.getElementById('irEv' + i);
+  if (!input || !input.value.trim()) return;
+  renderCheckResult(document.getElementById('irEvFb' + i), checkAnswer(input.value, IR_EVIDENCE[i]));
+}
+
+function renderLab7CapstoneHtml() {
+  const C = IR_CAPSTONE;
+  return `
+    <div class="lab4-capstone">
+      <div class="capstone-head">
+        <span class="capstone-badge">Capstone</span>
+        <span class="capstone-note">Answer all three to complete the lab — no hints.</span>
+      </div>
+      <div class="capstone-prompt">${C.intro}</div>
+      <div class="ir-scene" style="margin-bottom:14px;">${C.scene}</div>
+      ${C.questions.map(function (q) { return `
+        <div class="capstone-q-block">
+          <label class="capstone-q" for="irCap_${q.id}">${q.prompt}</label>
+          <input id="irCap_${q.id}" class="siem-check-input" type="text" placeholder="${q.placeholder}" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLab7Capstone();}">
+          <div id="irCapFb_${q.id}"></div>
+        </div>`; }).join('')}
+      <button class="btn btn-green capstone-btn" onclick="submitLab7Capstone()">Submit &amp; complete lab</button>
+      <div id="irCapstoneSummary" style="margin-top:10px;"></div>
+    </div>
+  `;
+}
+
+function submitLab7Capstone() {
+  const C = IR_CAPSTONE;
+  let allCorrect = true, answeredAll = true;
+  C.questions.forEach(function (q) {
+    const input = document.getElementById('irCap_' + q.id);
+    const fb = document.getElementById('irCapFb_' + q.id);
+    if (!input || !fb) return;
+    if (!input.value.trim()) { allCorrect = false; answeredAll = false; renderCheckResult(fb, { correct: false, message: 'Answer all three before submitting.' }); return; }
+    const res = checkAnswer(input.value, { accept: q.accept, right: 'Correct.', hint: C.wrongMsg });
+    renderCheckResult(fb, res);
+    if (!res.correct) allCorrect = false;
+  });
+  const summary = document.getElementById('irCapstoneSummary');
+  if (allCorrect) {
+    if (summary) summary.innerHTML = checkResultHtml(true, C.successMsg);
+    if (!lab7State.capstoneDone) { lab7State.capstoneDone = true; awardPoints(30); }
+    setTimeout(function () { finishLab7(); }, 900);
+  } else if (summary) {
+    summary.innerHTML = checkResultHtml(false, answeredAll
+      ? 'Not all three are right yet — fix the ones marked ✗ and resubmit. The lab completes only when all three are correct.'
+      : 'Answer all three questions, then submit. The lab completes only when all three are correct.');
+  }
 }
 
 /* ============================================================
