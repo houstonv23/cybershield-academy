@@ -1997,6 +1997,11 @@
     .ir-goals-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
     .ir-goals-list li { position: relative; padding-left: 20px; font-size: 12.5px; color: var(--text); line-height: 1.45; }
     .ir-goals-list li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+    /* Fading-scaffold: level badge + optional hint (early steps only) */
+    .ir-level { display: inline-block; font-size: 9px; letter-spacing: .5px; text-transform: uppercase; font-weight: 700; color: var(--muted); border: 1px solid var(--border); border-radius: 20px; padding: 1px 8px; margin-left: 8px; vertical-align: middle; }
+    .ir-hint-btn { background: transparent; border: 1px solid var(--border); color: var(--cyan); font-family: var(--font); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; border-radius: 3px; cursor: pointer; margin-bottom: 10px; }
+    .ir-hint-btn:hover { border-color: var(--cyan); background: rgba(0,212,255,.06); }
+    .ir-hint { padding: 10px 13px; margin-bottom: 12px; border: 1px solid var(--cyan); border-left: 3px solid var(--cyan); border-radius: 4px; background: rgba(56,189,248,.05); font-size: 11.5px; line-height: 1.6; color: var(--text); }
 
     /* Deep Dive Tracks */
     .track-header { margin-bottom: 28px; }
@@ -6882,6 +6887,25 @@ const IR_STEPS = [
 
 let lab7State = { stepIdx: 0, score: 0, answered: false };
 
+// Scaffolding FADES across the 5 IR steps (matches the SIEM lab's Guided ->
+// Your turn -> On your own ladder). Early steps offer a hint; by the Recovery
+// phase the learner is on their own. Keyed by step index — adjusts how much
+// help each existing step gives, adds no new steps.
+const IR_SCAFFOLD = {
+  0: { level: 'Guided', hint: 'Speed beats certainty in the opening minutes. A brute force followed by a successful login at 2 AM is a compromise until proven otherwise — which option stops the attacker\'s session right now, rather than tipping them off or burning time?' },
+  1: { level: 'Guided', hint: 'Containment means closing every door the attacker could use, not just the one they came through. An IP is trivial for them to swap — so which accounts are still exposed right now? Notice svc-backup: no MFA, weak password, not yet accessed.' },
+  2: { level: 'Your turn', hint: 'Port 4444 is a well-known default, not a random high port. Think about what kind of tool listens there, and what a sustained outbound connection to it says about the attacker\'s level of access.' },
+  3: { level: 'On your own' },
+  4: { level: 'On your own' },
+};
+
+function showLab7Hint() {
+  const h = document.getElementById('lab7Hint');
+  const b = document.getElementById('lab7HintBtn');
+  if (h) h.style.display = 'block';
+  if (b) b.style.display = 'none';
+}
+
 function renderLab7() {
   lab7State = { stepIdx: 0, score: 0, answered: false };
   renderLab7Step();
@@ -6889,6 +6913,7 @@ function renderLab7() {
 
 function renderLab7Step() {
   const step = IR_STEPS[lab7State.stepIdx];
+  const scaffold = IR_SCAFFOLD[lab7State.stepIdx] || {};
   const content = document.getElementById('labContent');
 
   // Build timeline dots
@@ -6927,10 +6952,11 @@ function renderLab7Step() {
         <div class="ir-timeline">${timelineHtml}</div>
       </div>
       <div>
-        <span class="ir-phase-badge ${step.phaseClass}">${step.phase} PHASE</span>
+        <span class="ir-phase-badge ${step.phaseClass}">${step.phase} PHASE</span>${scaffold.level ? `<span class="ir-level">${scaffold.level}</span>` : ''}
         <div style="font-size:16px;color:var(--cyan);margin-bottom:12px;text-shadow:0 0 8px var(--cyan);">${step.title}</div>
         <div class="ir-scene">${step.scene}</div>
         <div style="font-size:12px;color:var(--text);margin-bottom:10px;font-weight:600;">${step.question}</div>
+        ${scaffold.hint ? `<button id="lab7HintBtn" class="ir-hint-btn" onclick="showLab7Hint()">Show hint</button><div id="lab7Hint" class="ir-hint" style="display:none;">${scaffold.hint}</div>` : ''}
         <div class="ir-choices">${choicesHtml}</div>
         <div id="lab7Feedback"></div>
       </div>
