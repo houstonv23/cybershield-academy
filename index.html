@@ -1553,6 +1553,23 @@
     .am-detail-row.detect .am-detail-label { color: var(--cyan); }
     .am-detail-row.defend .am-detail-label { color: var(--green); }
     .am-detail-text { font-size: 12.5px; color: var(--text); line-height: 1.55; }
+    /* Predict-the-move gate (Module 8 IoT kill chain only) — theme-aware */
+    .am-predict-situation { font-size: 12.5px; line-height: 1.6; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--warning); border-radius: 8px; padding: 11px 13px; margin-bottom: 12px; }
+    .am-predict-q { font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .am-predict-opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .am-predict-opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-family: inherit; font-size: 12.5px; line-height: 1.45; cursor: pointer; transition: border-color .15s, background .15s; }
+    .am-predict-opt:hover:not(:disabled) { border-color: var(--cyan); }
+    .am-predict-opt:disabled { cursor: default; }
+    .am-predict-optltr { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px; background: var(--bg); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--muted); }
+    .am-predict-opt.correct { border-color: var(--green); background: rgba(53,208,127,.10); }
+    .am-predict-opt.correct .am-predict-optltr { border-color: var(--green); color: var(--green); }
+    .am-predict-opt.wrong { border-color: var(--danger); background: rgba(239,68,68,.08); }
+    .am-predict-opt.wrong .am-predict-optltr { border-color: var(--danger); color: var(--danger); }
+    .am-predict-opt.dim { opacity: .5; }
+    .am-predict-fb { margin-bottom: 10px; }
+    .am-predict-fb:empty { margin-bottom: 0; }
+    .am-reveal { animation: amRevealIn .25s ease; }
+    @keyframes amRevealIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
     /* ===== INTERACTIVE TERMINAL LAB ===== */
     .termlab { margin: 18px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0a0e14; }
@@ -12874,6 +12891,80 @@ const INSIDER_EXFIL_CHAIN = {"title": "Anatomy of an Insider Data Theft", "intro
 const IOT_PIVOT_CHAIN = {"title": "Anatomy of an IoT-to-Guest-Data Breach", "intro": "This kill chain traces how an attacker turns a forgotten smart-building device into a doorway to your entire guest database. The root cause is not sophisticated malware — it is two operational failures a hotel can fix: IoT devices left on default credentials, and a flat network where a lobby thermostat can talk to the property-management system (PMS). Follow the six stages to see how each defensive control breaks the chain, and why network segmentation is the single control that would have contained the whole incident.", "nodes": [{"tactic": "Initial Access", "technique": "Valid Accounts: Default Accounts", "mitre": "T1078.001", "what": "The attacker scans the internet, finds the hotel's building-management controller or lobby IP camera exposed on a public IP, and logs in with the vendor's factory default credentials (e.g. admin/admin) that were never changed during install.", "detect": "Alert on successful administrative logins to IoT/OT devices from external or non-management IP ranges, and flag devices whose management interfaces appear in external attack-surface scans (Shodan-style exposure).", "defend": "Change all vendor default credentials at commissioning and enforce a policy that no IoT/BMS device reaches production with factory passwords; never expose device management interfaces directly to the internet — put them behind a VPN."}, {"tactic": "Execution", "technique": "Command and Scripting Interpreter", "mitre": "T1059", "what": "Now authenticated to the device's embedded Linux shell or web console, the attacker runs commands on the thermostat/camera to establish a foothold, download tooling, and set up a base of operations inside the hotel network.", "detect": "Monitor IoT/embedded devices for anomalous process execution and outbound tool-download traffic; a camera or thermostat suddenly running shell commands or reaching out to pull binaries is a strong indicator.", "defend": "Restrict and disable unused shell/console access on embedded devices, keep device firmware patched, and place IoT gear on a locked-down VLAN with strict egress filtering so it cannot fetch attacker tooling."}, {"tactic": "Discovery", "technique": "Network Service Discovery", "mitre": "T1046", "what": "From the compromised device the attacker scans the local subnet and discovers — because the network is flat — that the IoT VLAN shares a segment with back-office systems, spotting the PMS server, booking database, and payment terminals just a few hops away.", "detect": "SOC catches internal port-sweeps and horizontal scanning: one host (especially an IoT device) probing many internal IPs/ports in a short window should trip IDS/NDR scan-detection rules.", "defend": "Network segmentation is the core control — IoT devices should live on an isolated VLAN with no route to business/PMS subnets, so a scan from a thermostat sees nothing but other thermostats."}, {"tactic": "Lateral Movement", "technique": "Remote Services", "mitre": "T1021", "what": "With no segmentation to stop it, the attacker pivots from the IoT device onto the PMS/booking network by connecting over exposed remote services (RDP/SMB/SSH) to a back-office server, moving from the smart-building world into the guest-data world.", "detect": "Alert on unexpected internal remote-service connections — especially any RDP/SMB/SSH session that originates from an IoT/OT device or crosses from the building-automation VLAN into the business VLAN.", "defend": "Enforce segmentation with firewall rules and ACLs that deny IoT-to-business traffic by default; require MFA and network-level authentication on remote services, and disable remote protocols not needed for operations."}, {"tactic": "Collection", "technique": "Data from Local System", "mitre": "T1005", "what": "On the PMS/booking server the attacker gathers what they came for: guest records, reservation details, passport/ID scans, and stored cardholder data, staging it locally for theft.", "detect": "Watch for unusual bulk read/access of guest and payment data stores, database queries returning abnormally large result sets, and files being archived or copied into staging directories on the PMS host.", "defend": "Encrypt cardholder and PII data at rest, tokenize payment data so the PMS never stores raw card numbers, apply least-privilege access controls, and use file/database access monitoring (DLP) to limit and log bulk reads."}, {"tactic": "Exfiltration", "technique": "Exfiltration Over C2 Channel", "mitre": "T1041", "what": "The attacker sends the collected guest and payment data back out over their existing command-and-control channel, quietly draining the hotel's booking database to an external server.", "detect": "Flag large or anomalous outbound data transfers to unfamiliar external destinations, long-lived beaconing sessions, and egress volumes from the PMS segment that deviate from baseline — classic exfil signatures.", "defend": "Enforce egress filtering and allow-list only known-good destinations from the PMS network, deploy DLP to block sensitive-data transfers, and route all outbound traffic through inspecting proxies so bulk PII leaving the property is caught and stopped."}]};
 const ATTACK_PATHS = { 'soc-3': HOTEL_KILL_CHAIN, 'pt-2': HOTEL_KILL_CHAIN, "humancyber-5": PHISH_RANSOMWARE_CHAIN, "humancyber-2": INSIDER_EXFIL_CHAIN, "hoteltech-8": IOT_PIVOT_CHAIN, };
 
+// Per-stage prediction prompts for the Module 8 IoT kill chain (hoteltech-8 /
+// IOT_PIVOT_CHAIN). Index-aligned to IOT_PIVOT_CHAIN.nodes: the learner reads
+// the situation and predicts the attacker's next move before the stage's
+// "What the attacker does" / detect / defend is revealed. `correct` is the
+// 0-based index of the right option; `hint` teaches without giving the answer.
+const IOT_PREDICT = [
+  {
+    situation: `The hotel installed a lobby IP camera and a building-management controller months ago and pushed both straight into production, reachable on a public IP. You're the SOC analyst tracing how the breach began.`,
+    options: [
+      'Send a convincing spear-phishing email to the front-desk manager',
+      'Log in to the exposed device using the vendor\'s factory default credentials (e.g. admin/admin)',
+      'Immediately deploy ransomware to encrypt the property-management system',
+      'Launch a denial-of-service flood against the hotel booking website',
+    ],
+    correct: 1,
+    hint: 'Think about the cheapest way in. These devices were shipped with a well-known default password and never hardened at install — no phishing or exploit is needed when a credential is sitting wide open.',
+  },
+  {
+    situation: `The attacker is now authenticated to the camera's embedded Linux shell. They hold one device but have no tooling on the network yet.`,
+    options: [
+      'Politely log out to avoid tripping any alarms',
+      'Reset the camera to factory settings to cover their tracks',
+      'Run shell commands on the device to establish a foothold and pull down attacker tooling',
+      'Encrypt the camera\'s firmware and demand a ransom for it',
+    ],
+    correct: 2,
+    hint: 'They control a shell now. The next step in the kill chain is to turn that access into a working base of operations — what do you do with a shell to set up and arm yourself?',
+  },
+  {
+    situation: `The attacker has a working foothold on the camera but is blind to the rest of the network. The hotel never segmented its VLANs, so everything shares one flat segment.`,
+    options: [
+      'Scan the local subnet to discover neighboring systems — and find the PMS, booking database, and payment terminals',
+      'Give up, since IoT devices are always isolated from business systems',
+      'Phone the front desk and ask for the PMS server\'s address',
+      'Stream the camera\'s video feed out to the public internet',
+    ],
+    correct: 0,
+    hint: 'They\'re on the network but have no map. Before they can reach guest data they need to know what else is reachable — what technique enumerates neighboring hosts and services on the subnet?',
+  },
+  {
+    situation: `The subnet scan revealed the PMS server and booking database sitting on the same flat network, with remote-access ports (RDP/SMB/SSH) open and reachable from the camera.`,
+    options: [
+      'Stay on the camera and take no further action',
+      'Pivot from the IoT device onto the PMS/booking server over the exposed remote services (RDP/SMB/SSH)',
+      'Patch the PMS server so no one else can exploit it',
+      'Disconnect the booking database to hide the intrusion',
+    ],
+    correct: 1,
+    hint: 'They can see the back-office servers and the remote-access ports are wide open. Moving from a compromised host to a higher-value one across the network is a named kill-chain step — which one?',
+  },
+  {
+    situation: `The attacker now has access to the PMS/booking server itself — the system that stores everything valuable about guests.`,
+    options: [
+      'Improve the hotel\'s backup and retention policy',
+      'Install a legitimate PMS software update',
+      'Gather and stage the guest records, reservations, passport/ID scans, and stored cardholder data',
+      'Book a complimentary room for the weekend',
+    ],
+    correct: 2,
+    hint: 'They\'ve reached the crown jewels. Before any data can leave the building it first has to be collected in one place — what would an attacker on the PMS server pull together?',
+  },
+  {
+    situation: `The attacker has staged a copy of the guest and payment database on the PMS server. Only one stage of the kill chain remains.`,
+    options: [
+      'Delete the data to free up disk space',
+      'Encrypt the data in place and walk away',
+      'Log off for good and never return',
+      'Send the collected data out over their command-and-control channel to an external server',
+    ],
+    correct: 3,
+    hint: 'They have the data, but it\'s still inside the hotel. The final stage of this kill chain moves it out — over what existing channel does the attacker quietly drain it?',
+  },
+];
+
 function buildAttackMap(modId) {
   const path = ATTACK_PATHS[modId];
   if (!path) return '';
@@ -12892,13 +12983,15 @@ function buildAttackMap(modId) {
         <div class="am-hdr-sub">${path.intro}</div>
       </div>
       <div class="am-rail">${nodes}</div>
-      <div class="am-detail" id="amdetail-${modId}">${amDetailHtml(path.nodes[0], 0)}</div>
+      <div class="am-detail" id="amdetail-${modId}">${amDetailHtml(path.nodes[0], 0, modId)}</div>
     </div>`;
 }
 
-function amDetailHtml(n, idx) {
+// The technique + MITRE line + the three content rows (what / detect / defend).
+// Factored out so the predict gate (Module 8) can reveal exactly this content
+// after the learner attempts a prediction, with no change to the other maps.
+function amRowsHtml(n) {
   return `
-    <div class="am-detail-tactic">Stage ${idx + 1} · ${n.tactic}</div>
     <div class="am-detail-tech">${n.technique}</div>
     <div class="am-detail-mitre">MITRE ATT&amp;CK ${n.mitre}</div>
     <div class="am-detail-row what">
@@ -12915,6 +13008,36 @@ function amDetailHtml(n, idx) {
     </div>`;
 }
 
+function amDetailHtml(n, idx, modId) {
+  const rows = amRowsHtml(n);
+  // Module 8 (IoT kill chain) only: hide the attacker action and make the
+  // learner predict it first; reveal the rows after they answer. Every other
+  // attack map falls through to the original all-at-once view unchanged.
+  if (modId === 'hoteltech-8' && typeof IOT_PREDICT !== 'undefined' && IOT_PREDICT[idx]) {
+    return amPredictHtml(idx, modId, rows);
+  }
+  return `
+    <div class="am-detail-tactic">Stage ${idx + 1} · ${n.tactic}</div>
+    ${rows}`;
+}
+
+function amPredictHtml(idx, modId, rows) {
+  const p = IOT_PREDICT[idx];
+  const solved = !!amPredictSolved[modId + '-' + idx];
+  const opts = p.options.map(function (o, i) {
+    const cls = solved ? (i === p.correct ? ' correct' : ' dim') : '';
+    return `<button class="am-predict-opt${cls}"${solved ? ' disabled' : ''} onclick="amPredict('${modId}',${idx},${i})">` +
+      `<span class="am-predict-optltr">${String.fromCharCode(65 + i)}</span><span>${o}</span></button>`;
+  }).join('');
+  return `
+    <div class="am-detail-tactic">Stage ${idx + 1} · Predict the attacker's move</div>
+    <div class="am-predict-situation">${p.situation}</div>
+    <div class="am-predict-q">Based on the situation above, what is the attacker's next move?</div>
+    <div class="am-predict-opts">${opts}</div>
+    <div class="am-predict-fb" id="amPredictFb-${modId}-${idx}">${solved ? checkResultHtml(true, AM_PREDICT_RIGHT) : ''}</div>
+    <div class="am-reveal" id="amReveal-${modId}-${idx}"${solved ? '' : ' style="display:none"'}>${rows}</div>`;
+}
+
 function amSelect(modId, idx) {
   const path = ATTACK_PATHS[modId];
   if (!path) return;
@@ -12925,7 +13048,37 @@ function amSelect(modId, idx) {
     if (node) node.classList.toggle('active', i === idx);
   });
   const detail = document.getElementById('amdetail-' + modId);
-  if (detail) detail.innerHTML = amDetailHtml(n, idx);
+  if (detail) detail.innerHTML = amDetailHtml(n, idx, modId);
+}
+
+// Predict-the-move gate for the Module 8 IoT kill chain. Routes the clicked
+// option through the shared checkAnswer/renderCheckResult pattern: a wrong
+// pick shows the teaching hint and lets the learner retry; a correct pick
+// reveals "What the attacker does" / detect / defend for that stage.
+const AM_PREDICT_RIGHT = 'Correct — that\'s the attacker\'s move. Here\'s exactly how it plays out, how the SOC catches it, and how to break the chain.';
+const amPredictSolved = {};
+function amPredict(modId, idx, choiceIdx) {
+  const p = (typeof IOT_PREDICT !== 'undefined') && IOT_PREDICT[idx];
+  if (!p) return;
+  const result = checkAnswer(p.options[choiceIdx], {
+    accept: [p.options[p.correct]],
+    right: AM_PREDICT_RIGHT,
+    hint: p.hint,
+  });
+  renderCheckResult(document.getElementById('amPredictFb-' + modId + '-' + idx), result);
+  const opts = document.querySelectorAll('#amdetail-' + modId + ' .am-predict-opt');
+  if (result.correct) {
+    amPredictSolved[modId + '-' + idx] = true;
+    const rev = document.getElementById('amReveal-' + modId + '-' + idx);
+    if (rev) rev.style.display = '';
+    opts.forEach(function (b, i) {
+      b.disabled = true;
+      b.classList.remove('wrong');
+      b.classList.add(i === p.correct ? 'correct' : 'dim');
+    });
+  } else if (opts[choiceIdx]) {
+    opts[choiceIdx].classList.add('wrong');
+  }
 }
 
 // Renders the study cards and videos interleaved: one video at the start,
