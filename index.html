@@ -14846,8 +14846,10 @@ function doLogin() {
     const u = d.user;
     const acct = {
       email: u.email, name: u.name, age: u.age || 18,
-      passwordHash: hash, version: null,
-      fullAccess: !!u.fullAccess, isAdmin: !!u.isAdmin,
+      // Reviewer accounts open in the Institutional/teacher edition; version is
+      // restored server-side via the reviewer flag on every login.
+      passwordHash: hash, version: u.reviewer ? 'k12' : null,
+      fullAccess: !!u.fullAccess, isAdmin: !!u.isAdmin, reviewer: !!u.reviewer,
       created: new Date().toISOString(), progress: null
     };
     const accs = getAccounts().filter(a => a.email !== u.email);
@@ -14906,6 +14908,7 @@ function doSignup() {
       email: u.email, name: u.name, age: u.age || ageVal,
       passwordHash: csaHash(password), version: null,
       discountEarned: _discountActive, fullAccess: !!u.fullAccess, isAdmin: !!u.isAdmin,
+      reviewer: !!u.reviewer,
       accessCodeUsed: null, created: new Date().toISOString(), progress: null
     };
     const accs = getAccounts().filter(a => a.email !== u.email);
@@ -14914,9 +14917,19 @@ function doSignup() {
     closeAuthModal();
     dismissDiscount();
     applyAccountAccess(newUser);
-    if (u.isAdmin) showToast('Admin account recognized — full access unlocked.');
+    if (u.reviewer) showToast('Reviewer access — all labs + Institutional view unlocked.');
+    else if (u.isAdmin) showToast('Admin account recognized — full access unlocked.');
     else if (u.fullAccess) showToast('Access code accepted — full access unlocked.');
-    routeByAge(ageVal, name);
+    // Reviewers open directly in the Institutional/teacher edition; everyone
+    // else is routed by age as before.
+    if (u.reviewer) {
+      userName = name;
+      localStorage.setItem('csa_name', name);
+      localStorage.setItem('csa_visited', '1');
+      selectVersion('k12');
+    } else {
+      routeByAge(ageVal, name);
+    }
   })
   .catch(() => {
     if (btn) { btn.disabled = false; }

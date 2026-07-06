@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { json, CORS, findByEmail, createRecord, signToken, isAdminEmail, isValidAccessCode } = require('./_shared');
+const { json, CORS, findByEmail, createRecord, signToken, isAdminEmail, isValidAccessCode, isReviewerCode } = require('./_shared');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -23,7 +23,10 @@ exports.handler = async (event) => {
   }
 
   const admin = isAdminEmail(email);
-  const fullAccess = admin || isValidAccessCode(accessCode);
+  // A reviewer code grants full access + the institutional/teacher view, but is
+  // never admin. Admin remains strictly email-based (ADMIN_EMAILS).
+  const reviewer = !admin && isReviewerCode(accessCode);
+  const fullAccess = admin || reviewer || isValidAccessCode(accessCode);
   const hash = await bcrypt.hash(password, 10);
 
   const fields = {
@@ -32,12 +35,14 @@ exports.handler = async (event) => {
     'Age': age,
     'Signed Up': new Date().toISOString().slice(0, 10),
     'Code': hash,
-    'Full Access': fullAccess ? 'Yes' : 'No',
+    // "Reviewer" is a distinct value so login can restore the institutional view
+    // and so it can be revoked later by flipping this field to "No".
+    'Full Access': reviewer ? 'Reviewer' : (fullAccess ? 'Yes' : 'No'),
     'Status': 'Active',
   };
-  const rec = await createRecord(fields);
+  const rec = await createRecord(fields, { typecast: true });
   if (rec.error) return json(502, { error: 'Could not create account. Please try again.' });
 
-  const token = signToken({ email, name, isAdmin: admin, fullAccess });
-  return json(200, { token, user: { email, name, age, fullAccess, isAdmin: admin } });
+  const token = signToken({ email, name, isAdmin: admin, fullAccess, reviewer });
+  return json(200, { token, user: { email, name, age, fullAccess, isAdmin: admin, reviewer } });
 };

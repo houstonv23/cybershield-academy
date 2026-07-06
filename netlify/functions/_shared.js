@@ -13,6 +13,11 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'houstonv2345@gmail.com')
   .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const ACCESS_CODES = (process.env.ACCESS_CODES || 'CYBERSHIELD-VIP,FOUNDERSCIRCLE,ETHAN-EDU-2026')
   .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+// Reviewer codes grant full Pro access PLUS the institutional/teacher view, but
+// NEVER admin. Kept in a separate env var so a reviewer can be revoked on its
+// own. No default is committed — set REVIEWER_CODES in the Netlify environment.
+const REVIEWER_CODES = (process.env.REVIEWER_CODES || '')
+  .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,8 +49,13 @@ async function findByEmail(email) {
   return (d.records && d.records[0]) || null;
 }
 
-async function createRecord(fields) {
-  const r = await fetch(AT_URL, { method: 'POST', headers: atHeaders, body: JSON.stringify({ fields }) });
+async function createRecord(fields, opts = {}) {
+  // typecast lets Airtable accept/auto-create a select option (e.g. a new
+  // "Reviewer" value on the Full Access column) so writes work whether that
+  // column is plain text or a single-select.
+  const payload = { fields };
+  if (opts.typecast) payload.typecast = true;
+  const r = await fetch(AT_URL, { method: 'POST', headers: atHeaders, body: JSON.stringify(payload) });
   return r.json();
 }
 
@@ -78,8 +88,9 @@ function verifyToken(auth) {
 
 const isAdminEmail = (email) => ADMIN_EMAILS.includes(String(email).toLowerCase());
 const isValidAccessCode = (code) => !!code && ACCESS_CODES.includes(String(code).trim().toUpperCase());
+const isReviewerCode = (code) => !!code && REVIEWER_CODES.includes(String(code).trim().toUpperCase());
 
 module.exports = {
   json, CORS, csaHash, findByEmail, createRecord, patchRecord, listRecords,
-  signToken, verifyToken, isAdminEmail, isValidAccessCode,
+  signToken, verifyToken, isAdminEmail, isValidAccessCode, isReviewerCode,
 };

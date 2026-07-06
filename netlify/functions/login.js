@@ -35,8 +35,12 @@ exports.handler = async (event) => {
 
   const f = rec.fields;
   const admin = isAdminEmail(email);
-  const fullAccess = admin || f['Full Access'] === 'Yes';
-  const token = signToken({ email, name: f['Name'] || email, isAdmin: admin, fullAccess });
+  // Access is re-derived from Airtable on every login, so revoking a reviewer is
+  // as simple as setting their "Full Access" back to "No" (or Status inactive).
+  const fa = f['Full Access'];
+  const reviewer = !admin && fa === 'Reviewer';
+  const fullAccess = admin || fa === 'Yes' || fa === 'Reviewer';
+  const token = signToken({ email, name: f['Name'] || email, isAdmin: admin, fullAccess, reviewer });
   return json(200, {
     token,
     user: {
@@ -45,6 +49,7 @@ exports.handler = async (event) => {
       age: f['Age'] || null,
       fullAccess,
       isAdmin: admin,
+      reviewer,
       labsComplete: f['Labs Complete'] || 0,
       totalXP: f['Total XP'] || 0,
     },
