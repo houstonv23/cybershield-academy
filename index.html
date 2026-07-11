@@ -15006,7 +15006,17 @@ function doSignup() {
     if (u.reviewer) showToast('Reviewer access — all labs + Kids Version preview unlocked.');
     else if (u.isAdmin) showToast('Admin account recognized — full access unlocked.');
     else if (u.fullAccess) showToast('Access code accepted — full access unlocked.');
-    routeByAge(ageVal, name);
+    if (u.reviewer) {
+      // Reviewers skip onboarding/placement and land straight in the professional
+      // learner view (all labs); the Kids Version is one click away via the toggle.
+      userName = name;
+      localStorage.setItem('csa_name', name);
+      localStorage.setItem('csa_version', 'industry');
+      localStorage.setItem('csa_visited', '1');
+      _launchApp();
+    } else {
+      routeByAge(ageVal, name);
+    }
   })
   .catch(() => {
     if (btn) { btn.disabled = false; }
