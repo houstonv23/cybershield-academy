@@ -16591,9 +16591,69 @@ function mgRunClassify() {
 }
 
 /* ============================================================
+   MAGIC-LINK REVIEWER ACCESS (guest)
+   A shareable URL (…/#magic=<token>) logs the visitor straight into a
+   full-access reviewer session — all labs at Pro + the institutional/teacher
+   view, never admin. The token is validated SERVER-SIDE by the magic-login
+   function; the browser only relays it (no secret in client code) and strips
+   it from the address bar immediately.
+   ============================================================ */
+function handleMagicLinkBoot() {
+  const raw = (location.hash.match(/(?:^|[#&])magic=([^&]+)/) || [])[1]
+           || (new URLSearchParams(location.search).get('magic') || '');
+  if (!raw) return false;
+  const token = decodeURIComponent(raw).trim();
+  // Remove the token from the URL / history / referrer right away.
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  fetch(`${FN_BASE}/magic-login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token })
+  })
+  .then(r => r.json().then(d => ({ ok: r.ok, d })))
+  .then(({ ok, d }) => {
+    if (!ok || !d.token || !d.user) { _magicLinkFallback(d && d.error); return; }
+    const u = d.user;
+    setToken(d.token);
+    const acct = {
+      email: u.email, name: u.name, age: u.age || 30, passwordHash: null,
+      version: u.reviewer ? 'k12' : null,
+      fullAccess: !!u.fullAccess, isAdmin: !!u.isAdmin, reviewer: !!u.reviewer, guest: !!u.guest,
+      created: new Date().toISOString(), progress: null
+    };
+    const accs = getAccounts().filter(a => a.email !== u.email);
+    accs.push(acct); saveAccounts(accs);
+    setCurrentUser(u.email);
+    loadUserProgress(acct);
+    applyAccountAccess(acct);   // premium + all labs; isAdminUser stays false (email-based)
+    userName = u.name;
+    localStorage.setItem('csa_name', u.name);
+    localStorage.setItem('csa_version', acct.version || 'industry'); // 'k12' = institutional/teacher view
+    // Drop any stale theme preference so the reviewer reliably lands in the
+    // institutional look for their version (they can still toggle it after).
+    if (u.reviewer) localStorage.removeItem('csa_theme');
+    localStorage.setItem('csa_visited', '1');
+    _launchApp();
+    showToast('Reviewer access — full labs + Institutional view unlocked.');
+  })
+  .catch(() => _magicLinkFallback());
+  return true;
+}
+function _magicLinkFallback(msg) {
+  const landing = document.getElementById('landing');
+  if (landing) landing.style.display = '';
+  document.getElementById('app').style.display = 'none';
+  showToast(msg || 'This access link is invalid or has expired.');
+}
+
+/* ============================================================
    INIT
    ============================================================ */
-if (localStorage.getItem('csa_visited')) {
+if (handleMagicLinkBoot()) {
+  // A magic link is authenticating asynchronously; it will launch the app
+  // (or fall back to the landing) on its own — skip the normal boot decision.
+} else if (localStorage.getItem('csa_visited')) {
   const _u = getCurrentUser();
   if (_u) {
     loadUserProgress(_u);

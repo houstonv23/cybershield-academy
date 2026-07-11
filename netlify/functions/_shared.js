@@ -18,6 +18,15 @@ const ACCESS_CODES = (process.env.ACCESS_CODES || 'CYBERSHIELD-VIP,FOUNDERSCIRCL
 // own. No default is committed — set REVIEWER_CODES in the Netlify environment.
 const REVIEWER_CODES = (process.env.REVIEWER_CODES || '')
   .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+// Magic-link tokens: the secret embedded in a shareable reviewer URL. The magic
+// link mints a full-access (labs + teacher view), never-admin reviewer session.
+// Comma-separate to issue several; delete/rotate one to revoke that link. No
+// default is committed — set REVIEWER_MAGIC_TOKENS in the Netlify environment.
+const REVIEWER_MAGIC_TOKENS = (process.env.REVIEWER_MAGIC_TOKENS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+// The synthetic identity a magic-link session runs as. Not a real account and
+// deliberately not an admin address.
+const REVIEWER_GUEST_EMAIL = process.env.REVIEWER_GUEST_EMAIL || 'reviewer.guest@cybershield.invalid';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -77,8 +86,8 @@ async function listRecords() {
   return out;
 }
 
-function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+function signToken(payload, expiresIn) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: expiresIn || '30d' });
 }
 function verifyToken(auth) {
   if (!auth) return null;
@@ -89,8 +98,11 @@ function verifyToken(auth) {
 const isAdminEmail = (email) => ADMIN_EMAILS.includes(String(email).toLowerCase());
 const isValidAccessCode = (code) => !!code && ACCESS_CODES.includes(String(code).trim().toUpperCase());
 const isReviewerCode = (code) => !!code && REVIEWER_CODES.includes(String(code).trim().toUpperCase());
+// Constant-time-ish exact match (case-sensitive: these are high-entropy tokens).
+const isReviewerMagicToken = (t) => !!t && REVIEWER_MAGIC_TOKENS.includes(String(t).trim());
 
 module.exports = {
   json, CORS, csaHash, findByEmail, createRecord, patchRecord, listRecords,
   signToken, verifyToken, isAdminEmail, isValidAccessCode, isReviewerCode,
+  isReviewerMagicToken, REVIEWER_GUEST_EMAIL,
 };
