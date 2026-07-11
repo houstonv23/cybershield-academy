@@ -544,9 +544,10 @@
     #kidsPreviewBanner span { flex:1; }
     #kidsPreviewBanner button { padding: 4px 14px; background: transparent; border: 1px solid #c084fc; color: #c084fc; font-family: var(--font); font-size: 10px; border-radius: 2px; cursor: pointer; letter-spacing: 1px; }
     #kidsPreviewBanner button:hover { background: rgba(147,51,234,.15); }
-    /* Reviewer-only floating control to open the Kids (K-12) preview. Shown only
-       for reviewer accounts (admins use the dashboard button). */
-    #reviewerKidsPreviewBtn { display:none; position:fixed; left:18px; bottom:18px; z-index:9000; align-items:center; gap:8px; background: rgba(147,51,234,.16); border:1px solid rgba(147,51,234,.5); color:#c084fc; padding:9px 15px; border-radius:10px; font-family: var(--font); font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.28); }
+    /* Floating control to open the Kids (K-12) preview from inside the app.
+       Shown to admins and reviewers; sits just above the ARIA button (bottom
+       right) so the two never overlap. */
+    #reviewerKidsPreviewBtn { display:none; position:fixed; right:28px; bottom:96px; z-index:9000; align-items:center; gap:8px; background: rgba(147,51,234,.16); border:1px solid rgba(147,51,234,.5); color:#c084fc; padding:10px 16px; border-radius:24px; font-family: var(--font); font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.28); backdrop-filter: blur(4px); }
     #reviewerKidsPreviewBtn:hover { background: rgba(147,51,234,.28); }
 
     /* ---- Nav ---- */
@@ -9192,7 +9193,7 @@ function _restorePrePreviewVersion() {
 function updateReviewerPreviewBtn() {
   const b = document.getElementById('reviewerKidsPreviewBtn');
   if (!b) return;
-  b.style.display = (isReviewerUser && !_kidsPreview) ? 'inline-flex' : 'none';
+  b.style.display = ((isAdminUser || isReviewerUser) && !_kidsPreview) ? 'inline-flex' : 'none';
 }
 
 // Re-apply theme + version-specific widgets after a version switch.
