@@ -15300,33 +15300,94 @@ const ARIA_KNOWLEDGE = {
   'social engineering|phishing|vishing': 'Social engineering exploits psychology: Authority ("I\'m from IT"), Urgency ("Act now or your account is locked"), Reciprocity (small favor first). Defense: verify through independent channels, never provide credentials over phone/email, psychological safety to say no.',
 };
 
+// --- ARIA helpers: turn the current module's own content (its plain-English
+// primer, or its reading phases) into real, contextual answers. ---
+function _ariaPlain(s, n) {
+  const t = String(s || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return (n && t.length > n) ? t.slice(0, n).trim() + '…' : t;
+}
+function _ariaPrimer(ctx) {
+  return (ctx && ctx.modId && typeof MODULE_PRIMERS !== 'undefined') ? MODULE_PRIMERS[ctx.modId] : null;
+}
+function ariaExplainModule(ctx) {
+  if (!ctx) return `You're not inside a specific module right now. Open one from the Content browser and I'll walk you through it — or just name a topic (e.g. "SIEM", "MFA", "GDPR") and I'll explain it.`;
+  const p = _ariaPrimer(ctx);
+  const phaseList = (ctx.phases || []).map(x => x.label).filter(Boolean).join(' · ');
+  if (p && p.gist) {
+    return `**${ctx.modTitle}** — in plain terms:\n\n${p.gist}${phaseList ? `\n\nIt's built from: ${phaseList}.` : ''}\n\nWant me to go deeper on any of those, or list the key terms?`;
+  }
+  const phases = ctx.phases || [];
+  if (!phases.length) return `You're studying **${ctx.modTitle}**. Ask me about any concept in it and I'll explain it.`;
+  return `**${ctx.modTitle}** covers:\n\n${phases.slice(0, 4).map(x => `**${x.label}:** ${_ariaPlain(x.body, 140)}`).join('\n\n')}\n\nWhich part should I dig into?`;
+}
+function ariaKeyTerms(ctx) {
+  if (!ctx) return `Name a module or topic and I'll list the key terms and what each one means.`;
+  const p = _ariaPrimer(ctx);
+  if (p && p.terms && p.terms.length) {
+    return `Key terms in **${ctx.modTitle}**:\n\n${p.terms.map(t => `**${t.t}** — ${_ariaPlain(t.d, 220)}`).join('\n\n')}`;
+  }
+  const phases = ctx.phases || [];
+  if (phases.length) return `The main topics in **${ctx.modTitle}**: ${phases.map(x => x.label).join(' · ')}. Ask me to define any of them and I'll break it down.`;
+  return `Tell me the topic and I'll list the key terms.`;
+}
+function ariaWhyMatters(ctx) {
+  if (!ctx) return `Open a module and I'll explain why it matters — both in the real world and on the exam.`;
+  const p = _ariaPrimer(ctx);
+  if (p && p.matters) return `Why **${ctx.modTitle}** matters:\n\n${p.matters}`;
+  return `**${ctx.modTitle}** matters because it's exactly what your CompTIA Security+ exam and a real SOC/analyst job test — and getting it wrong in production means missed intrusions or leaked data. Want the specifics for a particular part?`;
+}
+function ariaHint(ctx) {
+  if (!ctx) return `Tell me which module or question you're on and I'll give you a hint that points you at the answer without spoiling it.`;
+  const p = _ariaPrimer(ctx);
+  if (p && p.gist) {
+    return `Here's a nudge without giving it away — the core idea of **${ctx.modTitle}** is:\n\n${p.gist}\n\nRe-read that and the answer usually clicks. Still stuck? Tell me the exact term or step and I'll explain the concept behind it.`;
+  }
+  const phases = ctx.phases || [];
+  if (phases.length) {
+    return `Hint: the key is usually in **${phases[0].label}** — ${_ariaPlain(phases[0].body, 170)}\n\nRe-read that section and the answer should stand out. Tell me the specific term if you're still stuck.`;
+  }
+  return `Tell me the specific concept you're stuck on and I'll explain it so the answer becomes obvious.`;
+}
+
 function ariaGetResponse(input) {
-  const lower = input.toLowerCase();
+  const lower = input.toLowerCase().trim();
+  const ctx = ariaCurrentContext;
+
+  // Quick-action buttons — answered directly from the current module + its
+  // primer (gist / key terms / why-it-matters). These are what were falling
+  // through to the generic fallback before.
+  if (/^explain this module/.test(lower)) return ariaExplainModule(ctx);
+  if (/^key terms/.test(lower)) return ariaKeyTerms(ctx);
+  if (/^why does this matter/.test(lower)) return ariaWhyMatters(ctx);
+  if (/^give me a hint/.test(lower) || /\bhint\b/.test(lower)) return ariaHint(ctx);
 
   // Greetings
-  if (/^(hi|hello|hey|what can you do|who are you|help)/.test(lower)) {
+  if (/^(hi|hello|hey|what can you do|who are you)\b/.test(lower)) {
     return `Hi! I'm **ARIA** — your industry security training assistant. I can help you:\n\n• Explain concepts in modules you're studying\n• Clarify terminology and frameworks\n• Walk you through how security tools work\n• Answer "why does this matter?" questions\n\nJust ask me anything. What are you working on right now?`;
   }
 
   // Quiz answer fishing — deflect
-  if (/answer|what is the answer|which option|correct answer|tell me the answer/.test(lower)) {
+  if (/what is the answer|which option|correct answer|tell me the answer|the answer to/.test(lower)) {
     return `I won't give you the direct answer — that's what makes the knowledge stick. But I can explain the concept behind the question. What specifically are you confused about? Tell me the topic and I'll explain it so the answer becomes obvious.`;
   }
 
-  // Context-aware: if they're in a module, offer targeted help
-  if (ariaCurrentContext && /explain|help|confused|don't understand|clarify|what is|what does/.test(lower)) {
-    const ctx = ariaCurrentContext;
-    return `You're in **${ctx.trackTitle}** — ${ctx.modTitle}. Here's what this module covers:\n\n${ctx.phases.map(p => `**${p.label}:** ${p.body.slice(0,120)}...`).join('\n\n')}\n\nWhat specifically would you like me to dig into?`;
-  }
-
-  // Knowledge base lookup
+  // Specific keyword lookup (definitions, frameworks, tools) comes before the
+  // generic module walkthrough so "what is a SIEM?" gets the SIEM answer.
   for (const [pattern, response] of Object.entries(ARIA_KNOWLEDGE)) {
-    const regex = new RegExp(pattern, 'i');
-    if (regex.test(lower)) return response;
+    if (new RegExp(pattern, 'i').test(lower)) return response;
   }
 
-  // Fallback
-  return `Good question. I don't have a specific answer for "${input}" in my knowledge base right now, but here's how I'd approach it: search the topic on NIST.gov, CISA.gov, or the MITRE ATT&CK framework. These are the authoritative sources your exam and employer will reference. Want me to explain a related concept I do cover?`;
+  // Generic "explain / help / I'm confused / summarize" while in a module.
+  if (ctx && /explain|help|confused|don'?t understand|clarify|what is|what does|walk me|tell me about|summar|go over/.test(lower)) {
+    return ariaExplainModule(ctx);
+  }
+
+  // Fallback — contextual when we know the module, generic otherwise.
+  const p = _ariaPrimer(ctx);
+  if (ctx) {
+    return `I don't have a canned definition for "${input}", but you're on **${ctx.modTitle}**.${p && p.gist ? ` The core idea: ${p.gist}` : ''}\n\nTry the buttons below (Explain this module · Key terms · Why does this matter?), or ask me about a specific term and I'll define it.`;
+  }
+  return `Good question. I don't have a specific answer for "${input}" in my knowledge base right now — try opening a module (I'll explain it in context), or search the topic on NIST.gov, CISA.gov, or MITRE ATT&CK, the authoritative sources your exam and employer reference.`;
 }
 
 function ariaAddMessage(text, sender) {
