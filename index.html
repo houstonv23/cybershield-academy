@@ -600,18 +600,19 @@
       transition: color .15s;
     }
     .nav-signin:hover { color: #18181b; }
+    /* Quiet secondary link (was an outlined button) so "Get Started" is the one
+       prominent nav action for a first-time visitor. Feature is unchanged. */
     .nav-demo {
-      padding: 8px 16px;
+      padding: 8px 12px;
       font-size: 14px;
-      font-weight: 600;
-      color: #2563eb;
-      background: transparent;
-      border: 1px solid #2563eb;
-      border-radius: 4px;
+      font-weight: 500;
+      color: #52525b;
+      background: none;
+      border: none;
       cursor: pointer;
-      transition: all .15s;
+      transition: color .15s;
     }
-    .nav-demo:hover { background: #eef2ff; }
+    .nav-demo:hover { color: #18181b; }
     .nav-cta {
       padding: 8px 18px;
       font-size: 14px;
