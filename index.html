@@ -718,6 +718,22 @@
       white-space: nowrap;
     }
     .hero-btn-ghost:hover { background: #eef2ff; }
+    /* Secondary hero action as a quiet text link, so the primary "Get Started
+       Free" button is the single dominant call to action for first-time visitors. */
+    .hero-btn-link {
+      padding: 0 4px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #2563eb;
+      background: none;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hero-btn-link:hover { text-decoration: underline; }
     .hero-trust {
       display: flex;
       align-items: center;
@@ -2348,7 +2364,7 @@
         <p class="hero-outcome">No experience required — real tools and real scenarios from your very first lab.</p>
         <div class="hero-btns">
           <button class="hero-btn-primary" onclick="handleGetStarted()">Get Started Free</button>
-          <button class="hero-btn-ghost" onclick="document.getElementById('see-it').scrollIntoView({behavior:'smooth'})">See It in Action &rarr;</button>
+          <button class="hero-btn-link" onclick="document.getElementById('see-it').scrollIntoView({behavior:'smooth'})">See it in action &rarr;</button>
         </div>
         <div class="hero-trust">
           <span class="hero-trust-item"><span class="hero-trust-check">&#10003;</span> No credit card required</span>
@@ -3261,6 +3277,7 @@
         <div style="margin-bottom:8px;display:flex;justify-content:center;" data-ic="shield" data-sz="30" data-ic-color="#2563eb"></div>
         <h2 style="color:#fff;margin:0 0 6px;font-size:1.4rem;font-weight:700;">Welcome Back</h2>
         <p style="color:rgba(255,255,255,.5);margin:0;font-size:.85rem;">Sign in to continue your training</p>
+        <p style="color:rgba(255,255,255,.45);margin:10px 0 0;font-size:.78rem;line-height:1.55;">Enter the <b style="color:rgba(255,255,255,.72);font-weight:600;">email &amp; password</b> you signed up with. Have an <b style="color:rgba(255,255,255,.72);font-weight:600;">access code</b>? You enter that when you create your account, not here.</p>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div>
@@ -3275,7 +3292,7 @@
         <button id="loginBtn" onclick="doLogin()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:14px;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;width:100%;">Sign In →</button>
         <button onclick="continueAsGuest()" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;font-size:.85rem;cursor:pointer;font-family:inherit;">Continue without account</button>
       </div>
-      <p style="text-align:center;color:rgba(255,255,255,.4);font-size:.82rem;margin:20px 0 0;">Don't have an account? <span onclick="switchAuth('signup')" style="color:#2563eb;cursor:pointer;font-weight:600;">Create one free</span></p>
+      <p style="text-align:center;color:rgba(255,255,255,.55);font-size:.85rem;margin:20px 0 0;">New here? <span onclick="switchAuth('signup')" style="color:#2563eb;cursor:pointer;font-weight:700;">Create your free account &rarr;</span></p>
       <p style="text-align:center;color:rgba(255,255,255,.35);font-size:.78rem;margin:8px 0 0;">Approving a child's account? <span onclick="switchAuth('parent')" style="color:#3b9eff;cursor:pointer;font-weight:600;">Enter your code →</span></p>
     </div>
 
