@@ -3624,7 +3624,7 @@
   <div style="color:#fff;font-size:8px;font-weight:700;letter-spacing:.5px;margin-top:2px;">ARIA</div>
 </div>
 
-<div id="ariaPanel" style="display:none;position:fixed;bottom:96px;right:24px;z-index:8000;width:340px;background:#0d1117;border:1px solid rgba(37,99,235,.35);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div id="ariaPanel" style="display:none;position:fixed;bottom:96px;right:24px;z-index:10600;width:340px;background:#0d1117;border:1px solid rgba(37,99,235,.35);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <!-- Header -->
   <div style="background:linear-gradient(135deg,#2563eb,#6929c4);padding:16px 18px;display:flex;align-items:center;gap:12px;">
     <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -4059,7 +4059,10 @@
         <div class="mfocus-eyebrow" id="mfocusEyebrow"></div>
         <div class="mfocus-title" id="mfocusTitle"></div>
       </div>
-      <div class="mfocus-spacer"></div>
+      <button class="mfocus-exit" id="mfocusAriaBtn" onclick="openAriaFromModule()" title="Ask ARIA about the topic on screen" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Ask ARIA</span>
+      </button>
     </div>
     <div class="mfocus-content" id="mfocusContent"></div>
   </div>
@@ -12490,6 +12493,8 @@ function enterModuleFocus(modId, trackTitle, modTitle) {
   requestAnimationFrame(() => overlay.classList.add('open'));
   document.body.style.overflow = 'hidden';
   setAriaContext(modId, trackTitle, modTitle, f.mod.phases);
+  const _mab = document.getElementById('mfocusAriaBtn');
+  if (_mab) _mab.style.display = ((localStorage.getItem('csa_version') || 'industry') === 'industry') ? 'inline-flex' : 'none';
   if (f.mod.videos) initVideoSection(modId, f.mod.videos);
   if (typeof THREAT_MAP_MODULES !== 'undefined' && THREAT_MAP_MODULES.has(modId)) initThreatMap(modId);
   _focusMod = { modId, trackTitle, modTitle };
@@ -12611,6 +12616,16 @@ function answerMiniQuiz(modId, qi, chosen, correct) {
   let explanation = '';
   const found = _findModAndTrack(modId);
   if (found && found.mod.quiz && found.mod.quiz[qi]) explanation = found.mod.quiz[qi].explanation || '';
+  // Remember the question they just attempted so ARIA's "Give me a hint" can be
+  // specific to it (points at the relevant reading, never the answer).
+  if (found && found.mod.quiz && found.mod.quiz[qi] && ariaCurrentContext && ariaCurrentContext.modId === modId) {
+    const _phs = found.mod.phases || [];
+    ariaCurrentContext.lastQuestion = {
+      q: found.mod.quiz[qi].q,
+      phase: _phs.length ? _phs[qi % _phs.length] : null,
+      wasWrong: chosen !== correct,
+    };
+  }
   if (chosen === correct) {
     opts[chosen].classList.add('mq-correct');
     fb.className = 'mq-feedback mq-fb-correct';
@@ -14222,6 +14237,7 @@ function modPageGo(modId, idx) {
     const top = document.getElementById('tmod-' + modId);
     if (top) top.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  if (typeof _ariaSetPageContext === 'function') _ariaSetPageContext(modId, label);
 }
 
 function buildModuleFlow(mod) {
@@ -15311,6 +15327,11 @@ function _ariaPrimer(ctx) {
 }
 function ariaExplainModule(ctx) {
   if (!ctx) return `You're not inside a specific module right now. Open one from the Content browser and I'll walk you through it — or just name a topic (e.g. "SIEM", "MFA", "GDPR") and I'll explain it.`;
+  // If they're viewing a specific reading topic, explain THAT topic.
+  const page = ctx.currentPage;
+  if (page && page.kind === 'reading' && page.body) {
+    return `**${page.label}** (in **${ctx.modTitle}**):\n\n${_ariaPlain(page.body, 420)}\n\nWant this in plainer terms, or the key terms?`;
+  }
   const p = _ariaPrimer(ctx);
   const phaseList = (ctx.phases || []).map(x => x.label).filter(Boolean).join(' · ');
   if (p && p.gist) {
@@ -15338,6 +15359,23 @@ function ariaWhyMatters(ctx) {
 }
 function ariaHint(ctx) {
   if (!ctx) return `Tell me which module or question you're on and I'll give you a hint that points you at the answer without spoiling it.`;
+  // 1) Most specific: a quiz question they just attempted → point at the exact
+  //    reading it comes from, never the answer.
+  const lq = ctx.lastQuestion;
+  if (lq && lq.q) {
+    const ph = lq.phase;
+    return `On this question:\n\n_"${_ariaPlain(lq.q, 170)}"_\n\nI won't hand you the option — but ${ph ? `re-read **${ph.label}**:\n\n${_ariaPlain(ph.body, 200)}` : 'go back to the module reading on this topic'}\n\nThe right choice follows directly from that. Still stuck? Name the specific term and I'll explain the concept.`;
+  }
+  // 2) On the Knowledge Check but nothing attempted yet.
+  const page = ctx.currentPage;
+  if (page && page.kind === 'quiz') {
+    return `You're on the Knowledge Check for **${ctx.modTitle}**. Tap the option you think is right (even if you're unsure) and I'll explain the concept behind that exact question — or paste the question here and I'll walk you through the reasoning without giving the answer.`;
+  }
+  // 3) On a specific reading topic.
+  if (page && page.kind === 'reading' && page.body) {
+    return `Hint from what's on your screen — **${page.label}**:\n\n${_ariaPlain(page.body, 210)}\n\nThe answer usually follows directly from this. Tell me the specific term if you're still stuck.`;
+  }
+  // 4) Module-level nudge.
   const p = _ariaPrimer(ctx);
   if (p && p.gist) {
     return `Here's a nudge without giving it away — the core idea of **${ctx.modTitle}** is:\n\n${p.gist}\n\nRe-read that and the answer usually clicks. Still stuck? Tell me the exact term or step and I'll explain the concept behind it.`;
@@ -15347,6 +15385,32 @@ function ariaHint(ctx) {
     return `Hint: the key is usually in **${phases[0].label}** — ${_ariaPlain(phases[0].body, 170)}\n\nRe-read that section and the answer should stand out. Tell me the specific term if you're still stuck.`;
   }
   return `Tell me the specific concept you're stuck on and I'll explain it so the answer becomes obvious.`;
+}
+
+// Opens the ARIA panel from inside the module view (the "Ask ARIA" bar button).
+function openAriaFromModule() {
+  if (typeof ariaOpen !== 'undefined' && !ariaOpen) toggleAria();
+  const inp = document.getElementById('ariaInput');
+  if (inp) inp.focus();
+}
+
+// Called on every page change so ARIA knows exactly which topic (or the quiz)
+// is on screen — this is what makes hints/explanations reflect the active page.
+function _ariaSetPageContext(modId, label) {
+  const found = (typeof _findModAndTrack === 'function') ? _findModAndTrack(modId) : null;
+  if (!found) return;
+  const mod = found.mod;
+  if (!ariaCurrentContext || ariaCurrentContext.modId !== modId) {
+    setAriaContext(modId, found.track.title, mod.title, mod.phases || []);
+  }
+  const phases = mod.phases || [];
+  const phase = phases.find(p => p.label === label);
+  let page;
+  if (phase) page = { label: label, kind: 'reading', body: phase.body };
+  else if (/knowledge check/i.test(label)) page = { label: label, kind: 'quiz', questions: mod.quiz || [] };
+  else page = { label: label, kind: 'other' };
+  ariaCurrentContext.currentPage = page;
+  ariaCurrentContext.lastQuestion = null; // reset when the page changes
 }
 
 function ariaGetResponse(input) {
