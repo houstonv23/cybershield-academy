@@ -16321,29 +16321,45 @@ function mgRunRunner() {
   const t = game.theme;
   const groundY = 260;
   let playerY = groundY, vy = 0, jumping = false;
-  let obsX = 440, speed = 4.2, passed = false;
+  let obsX = 440, speed = 2.6, passed = false; // slower base speed so it's playable
+
   document.getElementById('mgPlayHint').textContent = game.controls;
 
-  function jump() { if (!jumping) { vy = -13; jumping = true; } }
+  function jump() { if (!jumping) { vy = -12.5; jumping = true; } }
   mgState.keyHandler = (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); } };
   document.addEventListener('keydown', mgState.keyHandler);
-  canvas.addEventListener('click', jump);
-  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); jump(); });
+  // Unified tap input: pointerdown covers mouse, touch AND pen; touchstart is a
+  // non-passive fallback for older mobile browsers. Both preventDefault so a tap
+  // doesn't scroll/zoom the page or double-fire. (Canvas has touch-action:none.)
+  const onTap = (e) => { e.preventDefault(); jump(); };
+  canvas.addEventListener('pointerdown', onTap);
+  canvas.addEventListener('touchstart', onTap, { passive: false });
 
-  function loop() {
+  let last = 0;
+  function loop(now) {
+    // Frame-rate independence: scale movement by elapsed frames (60fps = 1),
+    // capped so a stutter can't teleport the obstacle through the player.
+    const dt = last ? Math.min((now - last) / (1000 / 60), 2.5) : 1;
+    last = now;
+
     ctx.fillStyle = t.bg; ctx.fillRect(0, 0, 420, 320);
     ctx.strokeStyle = 'rgba(245,158,11,.4)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, groundY + 24); ctx.lineTo(420, groundY + 24); ctx.stroke();
 
-    playerY += vy; vy += 0.75;
+    playerY += vy * dt; vy += 0.7 * dt;
     if (playerY >= groundY) { playerY = groundY; vy = 0; jumping = false; }
 
-    obsX -= speed;
-    if (!passed && obsX < 50) { passed = true; mgState.score++; mgUpdateScoreUI(); speed += 0.45; }
+    obsX -= speed * dt;
+    if (!passed && obsX < 50) { passed = true; mgState.score++; mgUpdateScoreUI(); speed += 0.2; }
     if (obsX < -40) { obsX = 440 + Math.random() * 60; passed = false; }
 
     ctx.font = '38px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(t.player, 60, playerY + 14);
+    // Player runs to the RIGHT (obstacles come from the right), so mirror the
+    // sprite horizontally — the emoji glyphs face left by default.
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.fillText(t.player, -60, playerY + 14);
+    ctx.restore();
     ctx.fillText(t.obstacle, obsX, groundY + 14);
 
     // collision check
@@ -16353,7 +16369,7 @@ function mgRunRunner() {
     if (mgState.score >= 4) { endMiniGame(true); return; }
     mgState.raf = requestAnimationFrame(loop);
   }
-  loop();
+  mgState.raf = requestAnimationFrame(loop);
 }
 
 /* ---------- WHACK-A-MOLE ---------- */
